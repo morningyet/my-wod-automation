@@ -9,8 +9,8 @@
 // @grant        none
 // @modifier     morningyet
 // @version      2026.05.20.1
-// @updateURL    https://gitee.com/christophero/wod-scripts/raw/master/wod/WoD%20%E7%89%A9%E5%93%81%E6%89%B9%E9%87%8F%E5%AD%98%E6%94%BE%E4%BB%93%E5%BA%93.user.js
-// @downloadURL  https://gitee.com/christophero/wod-scripts/raw/master/wod/WoD%20%E7%89%A9%E5%93%81%E6%89%B9%E9%87%8F%E5%AD%98%E6%94%BE%E4%BB%93%E5%BA%93.user.js
+// @updateURL    https://gitee.com/Morningyet/my-wod-automation/raw/master/userItem/WoD-userItem.user.js
+// @downloadURL  https://gitee.com/Morningyet/my-wod-automation/raw/master/userItem/WoD-userItem.user.js
 // ==/UserScript==
 
 (function () {
