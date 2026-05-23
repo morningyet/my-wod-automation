@@ -83,14 +83,18 @@ class WoDAutomation:
             logger.error(message)
 
     async def wait_for_page(self, extra_wait=2, timeout=30000):
-        """等待页面加载完成（networkidle + 额外等待）"""
-        # 尝试等待页面网络请求全部完成
+        """等待页面加载完成（网络空闲 + DOM加载 + 额外等待）"""
+        # 先等待网络空闲
         try:
             await self.page.wait_for_load_state("networkidle", timeout=timeout)
         except:
-            # 超时则忽略，继续执行
             pass
-        # 额外等待指定秒数，确保动态内容加载完成
+        # 再等待 DOM 内容加载完成
+        try:
+            await self.page.wait_for_load_state("domcontentloaded", timeout=timeout)
+        except:
+            pass
+        # 额外等待指定秒数，确保页面稳定
         await asyncio.sleep(extra_wait)
 
     async def navigate_to_items(self):
@@ -464,8 +468,8 @@ class WoDAutomation:
             # 提前返回
             return
 
-        # 等待 2 秒，让搜索结果加载
-        await self.page.wait_for_timeout(2000)
+        # 等待页面加载完成（搜索后页面会刷新）
+        await self.wait_for_page(extra_wait=2)
         # 记录筛选完成的日志
         self.log("INFO", "筛选耗材完成")
 
@@ -587,8 +591,8 @@ class WoDAutomation:
         if not await self._retry_action(apply_changes, restore_after_apply, "应用改动按钮加载超时"):
             return
 
-        # 等待 2 秒，确保操作完成
-        await self.page.wait_for_timeout(2000)
+        # 等待页面加载完成（应用改动后页面会刷新）
+        await self.wait_for_page(extra_wait=2)
         # 记录移动完成的日志
         self.log("INFO", "全选并移动到团队仓库完成")
 
