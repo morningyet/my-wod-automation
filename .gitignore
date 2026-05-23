@@ -1,1 +1,5 @@
 .env
+.log
+.playwright-cli
+*.pyc
+

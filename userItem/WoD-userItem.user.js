@@ -8,7 +8,7 @@
 // @require      https://code.jquery.com/jquery-3.6.0.min.js
 // @grant        none
 // @modifier     morningyet
-// @version      2026.05.20.1
+// @version      2026.05.23.0
 // @updateURL    https://gitee.com/Morningyet/my-wod-automation/raw/master/userItem/WoD-userItem.user.js
 // @downloadURL  https://gitee.com/Morningyet/my-wod-automation/raw/master/userItem/WoD-userItem.user.js
 // ==/UserScript==
@@ -70,7 +70,8 @@
     "光辉草精华",
     "加工过的盐素",
     "玫瑰花瓣水",
-    "芳香精油"
+    "芳香精油",
+    "裂甲箭"
   ];
 
   // 正则表达式匹配的物品

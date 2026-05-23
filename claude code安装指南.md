@@ -4,14 +4,14 @@
 魔法云 https://cf02.magic.lat/#/register?code=MZnq09Se
 ```
 
-安装nvm
+安装nvm  --直接装node也不是不行
 ```shell
-# linux 环境  一行搞定
+# linux 环境  一行搞定   注意：执行后重启当前的shell/bash
 bash -c "$(curl -fsSL https://gitee.com/RubyMetric/nvm-cn/raw/main/install.sh)"
 
 # win 环境，先安装，再配置国内镜像
 https://gh-proxy.org/https://github.com/coreybutler/nvm-windows/releases/download/1.2.2/nvm-setup.zip
-#这两行放到 setting 安装目录里
+#这两行放到 setting 安装目录里  默认 C:\Users\Administrator\Downloads\nvm-setup.zip
 node_mirror: https://npmmirror.com/mirrors/node/ 
 npm_mirror: https://npmmirror.com/mirrors/npm/
 ```
@@ -75,4 +75,20 @@ npx skills add vercel-labs/agent-browser --skill agent-browser
  --remote-debugging-port=9222
  
 # 验证 localhost:9222/json 报错就是没生效
+```
+
+
+一些工具：
+```
+7-zip： 
+https://gitee.com/gitsharp/7zip/releases/tag/26.00
+
+icu.dll：
+https://www.dll-files.com/download/8dfbaf2e92aac3d4d94ee60406230ed5/icu.dll.html?c=YnhaTE5wLzRDK2ZWbElWbElwUWFJZz09
+
+git-for-win：
+https://registry.npmmirror.com/-/binary/git-for-windows/v2.51.0.windows.1/Git-2.51.0-64-bit.exe
+
+ndd: 
+https://gitee.com/cxasm/notepad--
 ```

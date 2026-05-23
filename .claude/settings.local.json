@@ -23,7 +23,11 @@
       "Bash(playwright-cli console:*)",
       "Bash(powershell -Command \"Get-Content 'C:\\\\Users\\\\morningyet\\\\.claude\\\\projects\\\\E--project-wod-win\\\\12a638dc-3d1c-4075-83e0-71229582633e.jsonl' | Select-Object -Last 50\")",
       "Bash(pip install:*)",
-      "Bash(python:*)"
+      "Bash(python:*)",
+      "Skill(wod-automation)",
+      "Bash(playwright-cli pages:*)",
+      "Bash(playwright-cli tab-list:*)",
+      "Bash(npx:*)"
     ]
   }
 }
