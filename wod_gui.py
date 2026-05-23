@@ -412,8 +412,10 @@ class WoDGUI:
                 self.root.after(0, lambda: self._on_harvest_complete())
             # 如果出现异常
             except Exception as e:
+                # 先捕获错误消息，避免 lambda 作用域问题
+                error_msg = str(e)
                 # 在主线程中调用收菜出错回调
-                self.root.after(0, lambda: self._on_harvest_error(str(e)))
+                self.root.after(0, lambda: self._on_harvest_error(error_msg))
 
         # 在后台线程中运行异步函数
         self.run_async(do_harvest())
@@ -514,8 +516,8 @@ class WoDGUI:
             # 立即执行一次收菜
             self.start_harvest()
 
-            # 设置下一次执行的定时器（将小时转换为毫秒）
-            self._schedule_next(interval * 3600 * 1000)
+            # 设置下一次执行的定时器（将小时转换为毫秒，转为整数）
+            self._schedule_next(int(interval * 3600 * 1000))
 
         # 如果出现值错误异常
         except ValueError as e:
@@ -550,8 +552,8 @@ class WoDGUI:
                 interval = float(self.interval_entry.get())
                 # 计算并显示下次执行时间
                 self._update_next_run_time(interval)
-                # 设置下一次定时器
-                self._schedule_next(interval * 3600 * 1000)
+                # 设置下一次定时器（转为整数）
+                self._schedule_next(int(interval * 3600 * 1000))
             # 如果出现异常
             except:
                 # 停止定时任务
