@@ -406,6 +406,25 @@ class WoDGUI:
         # 定义异步收菜函数
         async def do_harvest():
             try:
+                # 检查页面是否仍然可用
+                page_alive = False
+                try:
+                    page_alive = (
+                        self.automation.page is not None
+                        and not self.automation.page.is_closed()
+                        and self.automation.browser is not None
+                        and self.automation.browser.is_connected()
+                    )
+                except Exception:
+                    page_alive = False
+
+                # 页面已断开，重新走完整连接流程
+                if not page_alive:
+                    self.log("WARNING", "浏览器连接已断开，正在重新连接...")
+                    self.automation = WoDAutomation(log_callback=self.log, auto_login=True)
+                    await self.automation.connect()
+                    self.log("INFO", "重新连接成功")
+
                 # 处理所有英雄
                 await self.automation.process_all_heroes()
                 # 在主线程中调用收菜完成回调
