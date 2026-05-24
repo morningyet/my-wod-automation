@@ -2,4 +2,4 @@
 .log
 .playwright-cli
 *.pyc
-
+.claude
