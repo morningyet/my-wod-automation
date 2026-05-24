@@ -351,13 +351,20 @@ class WoDGUI:
         # 定义异步连接函数
         async def do_connect():
             try:
+                # 清理旧连接
+                if self.automation and self.automation.browser:
+                    try:
+                        await self.automation.browser.close()
+                    except:
+                        pass
                 # 创建自动化对象，传入日志回调和自动登录标志
                 self.automation = WoDAutomation(log_callback=self.log, auto_login=self.auto_login)
-                # 执行连接
-                await self.automation.connect()
+                # 执行连接，设置总超时 5 分钟
+                await asyncio.wait_for(self.automation.connect(), timeout=300)
                 # 在主线程中调用连接成功回调
                 self.root.after(0, self._on_connected)
-            # 如果出现异常
+            except asyncio.TimeoutError:
+                self.root.after(0, lambda: self._on_connect_error("连接超时（5分钟）"))
             except Exception as e:
                 # 在主线程中调用连接失败回调
                 self.root.after(0, lambda: self._on_connect_error(str(e)))

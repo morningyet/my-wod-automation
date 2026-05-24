@@ -102,7 +102,7 @@ class WoDAutomation:
         # 记录导航日志
         self.log("INFO", f"正在导航到物品页面: {WOD_ITEM_URL}")
         # 导航到物品页面
-        await self.page.goto(WOD_ITEM_URL)
+        await self.page.goto(WOD_ITEM_URL, wait_until="domcontentloaded", timeout=300000)
         # 等待页面加载完成，额外等待 2 秒
         await self.wait_for_page(extra_wait=2)
         # 记录导航完成日志
