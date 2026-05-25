@@ -426,8 +426,8 @@ class WoDAutomation:
     # 异步方法：获取当前英雄名称
     async def get_hero_name(self):
         """获取当前英雄名称（去掉": 仓库"等后缀）"""
-        # 定位页面中的 h1 标签并获取其文本内容
-        full_name = await self.page.locator("h1").text_content()
+        # 定位页面中的 h1 标签并获取其文本内容（取第一个，避免多元素报错）
+        full_name = await self.page.locator("h1").first.text_content()
         # 去掉": 仓库"等后缀，只保留英雄名字
         return full_name.split(":")[0]
 
@@ -438,6 +438,155 @@ class WoDAutomation:
         url = self.page.url
         # 检查 URL 中是否包含 "reason=mentor"
         return "reason=mentor" in url
+
+    async def clean_backpack(self):
+        """清理超载的背包"""
+        self.log("INFO", "检查背包是否超载...")
+
+        # 检查是否有超载提示
+        has_overload = await self.page.evaluate("""() => {
+            return document.body.textContent.includes("不得不抛弃");
+        }""")
+
+        if not has_overload:
+            self.log("INFO", "背包未超载，无需清理")
+            return
+
+        self.log("INFO", "检测到背包超载，开始清理...")
+
+        # 第3步：观察背包页面信息
+        info = await self.page.evaluate("""() => {
+            const row = document.querySelector("td.paginator_row");
+            if (!row) return {error: "无paginator_row"};
+
+            const pageBtns = row.querySelectorAll("input[name^='ITEMS_GEFUNDEN_PAGE'], input[name='dummy']");
+            const totalPages = pageBtns.length;
+
+            const currentBtn = row.querySelector(".paginator_selected");
+            const currentPage = currentBtn?.getAttribute("value")?.match(/=(\\d+)=/)?.[1] || "unknown";
+
+            const perPageInput = row.querySelector("input[name='ITEMS_GEFUNDEN_PSNR[1]']");
+            const perPage = perPageInput?.value || "unknown";
+
+            const sortBtn = document.querySelector("input[value*='价格']");
+            const sortValue = sortBtn?.value || "unknown";
+            const sortOrder = sortValue.includes("↑") ? "降序" : "升序";
+
+            return {
+                totalPages: totalPages,
+                currentPage: currentPage,
+                perPage: perPage,
+                sortOrder: sortOrder
+            };
+        }""")
+
+        self.log("INFO", f"页面信息: 总页数={info['totalPages']}, 当前页=第{info['currentPage']}页, "
+                        f"每页条数={info['perPage']}, 排序={info['sortOrder']}")
+
+        # 第5步：切换到第二页（价格降序时，低价物品在第2页）
+        if info['currentPage'] != '2':
+            await self.page.click('input[name="ITEMS_GEFUNDEN_PAGE[2]"]')
+            await asyncio.sleep(1)
+
+        # 第6步：确认第二页页面信息
+        current = await self.page.evaluate("""() => {
+            const currentBtn = document.querySelector(".paginator_selected");
+            return currentBtn?.getAttribute("value")?.match(/=(\\d+)=/)?.[1] || "unknown";
+        }""")
+
+        if current != '2':
+            self.log("WARNING", f"当前页不是第2页，而是第{current}页")
+            return
+
+        # 第7步和第8步：重复两次（点击丢弃全选 + 应用改动）
+        for i in range(2):
+            # 检查是否还在背包页面（有"不把沉重的背包清理一番"字样）
+            is_backpack_page = await self.page.evaluate("""() => {
+                return document.body.textContent.includes("不把沉重的背包清理一番");
+            }""")
+
+            if not is_backpack_page:
+                self.log("INFO", "已进入仓库页面，无需继续清理")
+                return
+
+            self.log("INFO", f"第{i+1}次：点击丢弃全选按钮")
+            await self.page.click('input[name="SellItemsFound_setter[1]"]')
+
+            self.log("INFO", f"第{i+1}次：点击应用改动")
+            await self.page.click('input[value="应用改动"]')
+            await asyncio.sleep(2)
+
+        # 第9步：回到第一页，读取页面信息
+        await self.page.click('input[name="ITEMS_GEFUNDEN_PAGE[1]"]')
+        await asyncio.sleep(1)
+
+        # 获取需要丢弃的数量
+        need_drop = await self.page.evaluate("""() => {
+            const body = document.body.textContent;
+            const match = body.match(/您在地城冒险中找到(\\d+)件物品.*不得不抛弃(\\d+)件物品/);
+            if (match) {
+                return parseInt(match[2]);
+            }
+            return 0;
+        }""")
+
+        if need_drop == 0:
+            self.log("INFO", "不需要再丢弃物品")
+            return
+
+        self.log("INFO", f"需要丢弃{need_drop}件物品")
+
+        # 第10步：从下向上选择N件物品
+        await self.page.evaluate(f"""() => {{
+            const paragraphs = document.querySelectorAll("p");
+            let targetParagraph = null;
+            for (let p of paragraphs) {{
+                if (p.textContent.includes("不把沉重的背包清理一番")) {{
+                    targetParagraph = p;
+                    break;
+                }}
+            }}
+
+            let current = targetParagraph.nextElementSibling;
+            while (current) {{
+                if (current.tagName === "TABLE" && current.classList.contains("content_table")) {{
+                    break;
+                }}
+                current = current.nextElementSibling;
+            }}
+
+            const rows = Array.from(current.querySelectorAll("tr"));
+            let rowsWithCheckbox = [];
+
+            rows.forEach(row => {{
+                const checkbox = row.querySelector("input[name^='SellItemsFound[']:not([name*='setter'])");
+                if (checkbox) {{
+                    rowsWithCheckbox.push({{ checkbox: checkbox, name: checkbox.name }});
+                }}
+            }});
+
+            for (let i = 1; i <= {need_drop} && i <= rowsWithCheckbox.length; i++) {{
+                const item = rowsWithCheckbox[rowsWithCheckbox.length - i];
+                item.checkbox.checked = true;
+            }}
+
+            return rowsWithCheckbox.length;
+        }}""")
+
+        # 第11步：点击应用改动
+        self.log("INFO", "点击应用改动")
+        await self.page.click('input[value="应用改动"]')
+        await asyncio.sleep(2)
+
+        # 第12步：检查是否成功进入仓库页面
+        has_overload = await self.page.evaluate("""() => {
+            return document.body.textContent.includes("不得不抛弃");
+        }""")
+
+        if has_overload:
+            self.log("WARNING", "清理后仍然超载")
+        else:
+            self.log("INFO", "清理背包完成，已进入仓库页面")
 
     # 异步方法：筛选耗材物品
     async def filter_consumables(self):
@@ -514,10 +663,9 @@ class WoDAutomation:
                 if attempt < max_retries - 1:
                     # 记录警告日志，准备刷新页面重试
                     self.log("WARNING", f"{error_msg}，刷新页面重试...")
-                    # 刷新页面，等待 DOM 内容加载完成
-                    await self.page.reload(wait_until="domcontentloaded")
-                    # 等待 2 秒，确保页面稳定
-                    await self.page.wait_for_timeout(2000)
+                    # 刷新页面并等待加载完成
+                    await self.page.reload()
+                    await self.wait_for_page(extra_wait=2)
                     # 执行恢复操作（重新设置之前已完成步骤的状态）
                     restore_result = await on_retry_fn()
                     # 如果恢复操作返回 False，说明页面状态无法恢复，不再重试
@@ -613,10 +761,50 @@ class WoDAutomation:
             # 重新抛出异常
             raise
 
-        # 等待 2 秒
-        await self.page.wait_for_timeout(2000)
+        # 等待页面加载完成
+        await self.wait_for_page(extra_wait=1)
         # 记录切换完成的日志
         self.log("INFO", "切换英雄完成")
+
+    # 异步方法：设置地城时间
+    async def set_dungeon_time(self):
+        """设置地城时间（点击 reduce_dungeon_time 按钮）"""
+        # 等待页面加载完成
+        await self.wait_for_page(extra_wait=1)
+
+        # 判断是否存在减少地城时间按钮
+        btn = self.page.locator('input[name="reduce_dungeon_time"]')
+        has_btn = await btn.count() > 0
+
+        if not has_btn:
+            self.log("INFO", "  -> 跳过设置地城时间: 无减少时间按钮")
+            return
+
+        # 执行减少地城时间操作
+        button_value = await btn.get_attribute("value", timeout=2000)
+        self.log("INFO", f"  -> 地城时间（设置前）: {button_value}")
+
+        # 获取 onclick 属性并提取 AJAX URL
+        onclick = await btn.get_attribute("onclick", timeout=2000)
+        import re
+        match = re.search(r"ajaxFetchUrl\('([^']+)'", onclick)
+        if match:
+            url = match.group(1)
+            # 执行 AJAX 请求并获取结果
+            result = await self.page.evaluate(f"fetch('{url}').then(r => r.text())")
+            self.log("INFO", f"  -> AJAX 响应: {result[:100]}")
+
+        # 等待页面更新
+        await asyncio.sleep(1)
+
+        # 检查页面元素是否有变化
+        time_after = await self.page.evaluate("""() => {
+            const gadget = document.getElementById('gadgetNextdungeonTime');
+            return gadget ? gadget.textContent : null;
+        }""")
+
+        if time_after and time_after != button_value:
+            self.log("INFO", f"  -> 地城时间（设置后）: {time_after}")
 
     # 异步方法：处理单个英雄
     async def process_hero(self):
@@ -635,11 +823,17 @@ class WoDAutomation:
             # 返回 False 表示未处理
             return False
 
+        # 清理超载的背包
+        await self.clean_backpack()
+
         # 筛选耗材
         await self.filter_consumables()
 
         # 全选并移动
         await self.select_all_and_move_to_warehouse()
+
+        # 切换到下一个英雄前设置地城时间
+        await self.set_dungeon_time()
 
         # 切换到下一个英雄
         await self.switch_to_next_hero()
