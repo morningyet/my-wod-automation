@@ -3,3 +3,4 @@
 .playwright-cli
 *.pyc
 .claude
+worldview/worldSing
