@@ -797,7 +797,7 @@ class WoDAutomation:
         btn = self.page.locator('input[name="reduce_dungeon_time"]')
         has_btn = await btn.is_visible()
 
-                # 执行减少地城时间操作
+        # 执行减少地城时间操作
         time_before = await self.page.evaluate("() => { const el = document.getElementById('gadgetNextdungeonTime'); return el ? el.textContent : ''; }")
         self.log("INFO", f"  -> 地城时间（设置前）: {time_before}")
 
@@ -817,6 +817,9 @@ class WoDAutomation:
             else:
                 self.log("INFO", f"  -> AJAX 响应(前500字符): {result[:500]}")
 
+            self.log("INFO", "  -> 刷新当前页面")
+            # 刷新当前页面
+            await self.page.reload(wait_until="domcontentloaded")
         # 等待页面更新
         await self.wait_for_page(extra_wait=1)
 
