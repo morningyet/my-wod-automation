@@ -14,8 +14,8 @@ import time
 import logging
 # 导入 os 库，用于操作系统相关操作
 import os
-# 导入 re 库，用于正则表达式（当前未使用）
 import re
+import traceback
 # 从 playwright.async_api 导入 async_playwright，用于浏览器自动化
 from playwright.async_api import async_playwright
 # 从 dotenv 导入 load_dotenv，用于加载 .env 文件
@@ -51,17 +51,12 @@ logger = logging.getLogger(__name__)
 class WoDAutomation:
     # 初始化方法，创建对象时调用
     def __init__(self, log_callback=None, auto_login=True):
-        # 浏览器对象，初始为 None
         self.browser = None
-        # 页面对象，初始为 None
         self.page = None
-        # 第一个英雄的名字，初始为 None
+        self.playwright = None
         self.first_hero = None
-        # 已处理的英雄数量，初始为 0
         self.processed_count = 0
-        # 日志回调函数，用于向 GUI 发送日志
         self.log_callback = log_callback
-        # 是否自动登录，默认为 True
         self.auto_login = auto_login
 
     # 日志方法，向 GUI 和标准日志输出信息
@@ -82,6 +77,21 @@ class WoDAutomation:
         elif level == "ERROR":
             logger.error(message)
 
+    async def close(self):
+        """释放浏览器连接和 Playwright 资源"""
+        if self.browser:
+            try:
+                self.browser = None
+            except:
+                pass
+        if self.playwright:
+            try:
+                await self.playwright.stop()
+            except:
+                pass
+            self.playwright = None
+        self.page = None
+
     async def wait_for_page(self, extra_wait=2, timeout=30000):
         """等待页面加载完成（网络空闲 + DOM加载 + 额外等待）"""
         # 先等待网络空闲
@@ -96,6 +106,8 @@ class WoDAutomation:
             pass
         # 额外等待指定秒数，确保页面稳定
         await asyncio.sleep(extra_wait)
+        # 确保页面有效
+        await self.ensure_page_valid()
 
     async def ensure_page_valid(self, retry_times=3):
         """确保页面有效，如果检测到错误页面则刷新
@@ -332,12 +344,12 @@ class WoDAutomation:
             # 将密码填入输入框
             await password_input.fill(WOD_PASSWORD)
             # 等待 1 秒，确保填入完成
-            await asyncio.sleep(1)
+            await self.wait_for_page(extra_wait=1)
 
         # 选择世界
         self.log("INFO", "选择世界: 4 Delta")
         await self.page.locator('select#world').select_option("CD")
-        await asyncio.sleep(0.5)
+        await self.wait_for_page(extra_wait=0.5)
 
         # 打印点击登录按钮的日志
         self.log("INFO", "点击登录按钮...")
@@ -376,9 +388,9 @@ class WoDAutomation:
             # 记录尝试连接到调试端口的日志
             logger.info(f"尝试连接到 Edge 调试端口 http://localhost:{DEBUG_PORT}")
             # 启动 Playwright
-            playwright = await async_playwright().start()
+            self.playwright = await async_playwright().start()
             # 通过 CDP 连接到浏览器
-            self.browser = await playwright.chromium.connect_over_cdp(
+            self.browser = await self.playwright.chromium.connect_over_cdp(
                 f"http://localhost:{DEBUG_PORT}"
             )
             # 记录连接成功的日志
@@ -535,8 +547,9 @@ class WoDAutomation:
 
         # 第5步：切换到第二页（价格降序时，低价物品在第2页）
         if info['currentPage'] != '2':
+            self.log("INFO", "切换到第2页")
             await self.page.click('input[name="ITEMS_GEFUNDEN_PAGE[2]"]')
-            await asyncio.sleep(1)
+            await self.wait_for_page(extra_wait=1)
 
         # 第6步：确认第二页页面信息
         current = await self.page.evaluate("""() => {
@@ -561,14 +574,15 @@ class WoDAutomation:
 
             self.log("INFO", f"第{i+1}次：点击丢弃全选按钮")
             await self.page.click('input[name="SellItemsFound_setter[1]"]')
+            await self.wait_for_page(extra_wait=1)
 
             self.log("INFO", f"第{i+1}次：点击应用改动")
             await self.page.click('input[value="应用改动"]')
-            await asyncio.sleep(2)
+            await self.wait_for_page(extra_wait=2)
 
         # 第9步：回到第一页，读取页面信息
         await self.page.click('input[name="ITEMS_GEFUNDEN_PAGE[1]"]')
-        await asyncio.sleep(1)
+        await self.wait_for_page(extra_wait=1)
 
         # 获取需要丢弃的数量
         need_drop = await self.page.evaluate("""() => {
@@ -626,7 +640,7 @@ class WoDAutomation:
         # 第11步：点击应用改动
         self.log("INFO", "点击应用改动")
         await self.page.click('input[value="应用改动"]')
-        await asyncio.sleep(2)
+        await self.wait_for_page(extra_wait=2)
 
         # 第12步：检查是否成功进入仓库页面
         has_overload = await self.page.evaluate("""() => {
@@ -639,10 +653,10 @@ class WoDAutomation:
             self.log("INFO", "清理背包完成，已进入仓库页面")
 
     # 异步方法：筛选耗材物品
-    async def filter_consumables(self):
+    async def filter_seconds(self):
         """筛选耗材物品"""
         # 确保页面有效
-        await self.ensure_page_valid()
+        await self.wait_for_page(extra_wait=2)
         # 记录正在筛选耗材的日志
         self.log("INFO", "正在筛选耗材...")
         try:
@@ -650,6 +664,7 @@ class WoDAutomation:
             await self.page.wait_for_selector('input[name="item_3usage_item"][value="yes"]', timeout=30000)
             # 点击耗材筛选复选框
             await self.page.locator('input[name="item_3usage_item"][value="yes"]').click()
+            await self.wait_for_page(extra_wait=1)
         # 如果出现异常
         except Exception as e:
             # 记录警告日志
@@ -674,10 +689,34 @@ class WoDAutomation:
         # 记录筛选完成的日志
         self.log("INFO", "筛选耗材完成")
 
+    async def filter_pieces(self):
+        """筛选镶嵌材料物品"""
+        await self.wait_for_page(extra_wait=2)
+        self.log("INFO", "正在筛选镶嵌材料...")
+        try:
+            await self.page.wait_for_selector('input[name="item_3usage_item"][value=""]', timeout=30000)
+            await self.page.locator('input[name="item_3usage_item"][value=""]').click()
+            await self.page.wait_for_selector('select[name="item_3sockets"]', timeout=30000)
+            await self.page.locator('select[name="item_3sockets"]').select_option("-1")
+            await self.wait_for_page(extra_wait=1)
+        except Exception as e:
+            self.log("WARNING", f"镶嵌材料筛选框未找到: {e}")
+            return
+
+        try:
+            await self.page.wait_for_selector("text=开始搜索", timeout=30000)
+            await self.page.locator("text=开始搜索").click()
+        except Exception as e:
+            self.log("WARNING", f"搜索按钮未找到: {e}")
+            return
+
+        await self.wait_for_page(extra_wait=2)
+        self.log("INFO", "筛选镶嵌材料完成")
+
     async def _click_first_checkbox(self):
         """点击位置列全选复选框，返回是否成功"""
         # 记录正在点击全选复选框的日志
-        self.log("INFO", "正在点击全选复选框...")
+        self.log("INFO", "正在点击全选位置复选框...")
         try:
             # 使用 XPath 精确定位 thead 中的位置列全选框
             # thead 和 tfoot 都有同名复选框，需要指定 thead
@@ -686,8 +725,9 @@ class WoDAutomation:
             if await checkbox.count() > 0:
                 # 点击复选框
                 await checkbox.click()
+                await self.wait_for_page(extra_wait=1)
                 # 记录点击成功的日志
-                self.log("INFO", "全选复选框点击完成")
+                self.log("INFO", "全选位置复选框点击完成")
                 # 返回 True 表示成功
                 return True
             else:
@@ -697,106 +737,30 @@ class WoDAutomation:
                 return False
         except:
             # 未找到复选框，记录警告日志
-            self.log("WARNING", "全选复选框未找到，跳过")
+            self.log("WARNING", "全选位置复选框未找到，跳过")
             # 返回 False 表示失败
             return False
 
-    async def _retry_action(self, action_fn, on_retry_fn, error_msg, max_retries=2):
-        """通用重试模式：执行操作，失败则刷新页面并恢复"""
-        # 循环重试
-        for attempt in range(max_retries):
-            try:
-                # 执行目标操作
-                await action_fn()
-                # 操作成功，返回 True
-                return True
-            except Exception as e:
-                # 如果还有重试机会
-                if attempt < max_retries - 1:
-                    # 记录警告日志，准备刷新页面重试
-                    self.log("WARNING", f"{error_msg}，刷新页面重试...")
-                    # 刷新页面并等待加载完成
-                    await self.page.reload()
-                    await self.wait_for_page(extra_wait=2)
-                    # 执行恢复操作（重新设置之前已完成步骤的状态）
-                    restore_result = await on_retry_fn()
-                    # 如果恢复操作返回 False，说明页面状态无法恢复，不再重试
-                    if restore_result is False:
-                        self.log("WARNING", f"{error_msg}，恢复失败，不再重试")
-                        return False
-                else:
-                    # 重试次数用尽，记录失败日志
-                    self.log("WARNING", f"{error_msg}: {e}")
-                    # 返回 False 表示操作失败
-                    return False
-
-    async def select_all_and_move_to_warehouse(self):
-        """全选并移动到团队仓库"""
-        # 确保页面有效
-        await self.ensure_page_valid()
-        # 记录正在全选并移动的日志
-        self.log("INFO", "正在全选并移动到团队仓库...")
-        # 步骤1：点击第一个复选框（全选），如果没有物品则直接返回
+    async def move_to_warehouse(self, target, target_name):
+        """全选并移动到指定仓库"""
+        self.log("INFO", f"准备将选中物品移动到{target_name}")
+        self.log("INFO", "全选")
         if not await self._click_first_checkbox():
-            # 没有可操作的物品，记录日志并提前返回
-            self.log("INFO", "没有可操作的物品，跳过移动到团队仓库")
+            self.log("INFO", f"没有可操作的物品，跳过移动到{target_name}")
             return
-        # 等待 500 毫秒
-        await self.page.wait_for_timeout(500)
+        await self.wait_for_page(extra_wait=0.5)
 
-        # 步骤2：选择团队仓库
-        # 定义选择仓库的操作
-        async def select_warehouse():
-            # 等待选择框加载，超时 30 秒（指定 thead 避免匹配多个）
-            await self.page.wait_for_selector('thead select[name="dummy"]', timeout=30000)
-            # 选择团队仓库选项（使用 first 避免匹配多个）
-            await self.page.locator('thead select[name="dummy"]').select_option("go_group_2")
+        self.log("INFO", "移动...")
+        await self.page.wait_for_selector('thead select[name="dummy"]', timeout=30000)
+        await self.page.locator('thead select[name="dummy"]').select_option(target)
+        await self.wait_for_page(extra_wait=0.5)
 
-        # 定义刷新后需要执行的恢复操作（重新全选）
-        async def restore_after_select():
-            return await self._click_first_checkbox()
-
-        # 执行选择仓库操作（带重试），失败则提前返回
-        if not await self._retry_action(select_warehouse, restore_after_select, "选择框加载超时"):
-            return
-
-        # 等待 500 毫秒
-        await self.page.wait_for_timeout(500)
-
-        # 步骤3：点击应用改动按钮
-        # 定义应用改动的操作
-        async def apply_changes():
-            # 等待按钮可点击，超时 30 秒
-            await self.page.wait_for_selector('input[value="应用改动"]', timeout=30000)
-            # 点击应用改动按钮（使用 first 因为页面上有多个）
-            await self.page.locator('input[value="应用改动"]').first.click()
-
-        # 定义刷新后需要执行的恢复操作（重新全选 + 重新选仓库）
-        async def restore_after_apply():
-            # 重新全选，如果失败则直接返回 False
-            if not await self._click_first_checkbox():
-                return False
-            # 等待 500 毫秒
-            await self.page.wait_for_timeout(500)
-            try:
-                # 等待选择框加载（指定 thead 避免匹配多个）
-                await self.page.wait_for_selector('thead select[name="dummy"]', timeout=30000)
-                # 重新选择团队仓库（使用 thead 避免匹配多个）
-                await self.page.locator('thead select[name="dummy"]').select_option("go_group_2")
-                # 等待 500 毫秒
-                await self.page.wait_for_timeout(500)
-            except:
-                # 恢复失败则忽略
-                pass
-
-        # 执行应用改动操作（带重试），失败则提前返回
-        if not await self._retry_action(apply_changes, restore_after_apply, "应用改动按钮加载超时"):
-            return
-
-        # 等待页面加载完成（应用改动后页面会刷新）
+        self.log("INFO", "应用...")
+        await self.page.wait_for_selector('input[value="应用改动"]', timeout=30000)
+        await self.page.locator('input[value="应用改动"]').first.click()
         await self.wait_for_page(extra_wait=2)
-        # 记录移动完成的日志
-        self.log("INFO", "全选并移动到团队仓库完成")
+        self.log("INFO", f"全选并移动到{target_name}完成")
+
 
     # 异步方法：切换到下一个英雄
     async def switch_to_next_hero(self):
@@ -810,6 +774,7 @@ class WoDAutomation:
             await self.page.wait_for_selector('img[alt="切换到下一个活跃的英雄"]', timeout=30000)
             # 点击切换英雄按钮
             await self.page.locator('img[alt="切换到下一个活跃的英雄"]').click()
+            await self.wait_for_page(extra_wait=1)
         # 如果出现异常
         except Exception as e:
             # 记录警告日志
@@ -830,37 +795,40 @@ class WoDAutomation:
 
         # 判断是否存在减少地城时间按钮
         btn = self.page.locator('input[name="reduce_dungeon_time"]')
-        has_btn = await btn.count() > 0
+        has_btn = await btn.is_visible()
+
+                # 执行减少地城时间操作
+        time_before = await self.page.evaluate("() => { const el = document.getElementById('gadgetNextdungeonTime'); return el ? el.textContent : ''; }")
+        self.log("INFO", f"  -> 地城时间（设置前）: {time_before}")
 
         if not has_btn:
             self.log("INFO", "  -> 跳过设置地城时间: 无减少时间按钮")
             return
 
-        # 执行减少地城时间操作
-        button_value = await btn.get_attribute("value", timeout=2000)
-        self.log("INFO", f"  -> 地城时间（设置前）: {button_value}")
-
         # 获取 onclick 属性并提取 AJAX URL
         onclick = await btn.get_attribute("onclick", timeout=2000)
-        import re
-        match = re.search(r"ajaxFetchUrl\('([^']+)'", onclick)
+        match = re.search(r"ajaxFetchUrl\(\s*'([^']+)'", onclick)
         if match:
             url = match.group(1)
-            # 执行 AJAX 请求并获取结果
+            self.log("INFO", f"  -> AJAX 请求 URL: {url}")
             result = await self.page.evaluate(f"fetch('{url}').then(r => r.text())")
-            self.log("INFO", f"  -> AJAX 响应: {result[:100]}")
+            if len(result) <= 500:
+                self.log("INFO", f"  -> AJAX 响应: {result}")
+            else:
+                self.log("INFO", f"  -> AJAX 响应(前500字符): {result[:500]}")
 
         # 等待页面更新
-        await asyncio.sleep(1)
+        await self.wait_for_page(extra_wait=1)
 
         # 检查页面元素是否有变化
-        time_after = await self.page.evaluate("""() => {
-            const gadget = document.getElementById('gadgetNextdungeonTime');
-            return gadget ? gadget.textContent : null;
-        }""")
+        time_after = await self.page.evaluate("() => { const el = document.getElementById('gadgetNextdungeonTime'); return el ? el.textContent : ''; }")
 
-        if time_after and time_after != button_value:
+        if time_after:
             self.log("INFO", f"  -> 地城时间（设置后）: {time_after}")
+
+        btn_visible = await self.page.locator('input[name="reduce_dungeon_time"]').is_visible()
+        if not btn_visible:
+            self.log("INFO", "  -> 加速成功")
 
     # 异步方法：处理单个英雄
     async def process_hero(self):
@@ -881,14 +849,18 @@ class WoDAutomation:
 
         # 清理超载的背包
         await self.clean_backpack()
-
+        
         # 筛选耗材
-        await self.filter_consumables()
-
+        await self.filter_seconds()
         # 全选并移动
-        await self.select_all_and_move_to_warehouse()
+        await self.move_to_warehouse("go_group_2", "团队仓库")
 
-        # 切换到下一个英雄前设置地城时间
+        # 筛选镶嵌物品
+        await self.filter_pieces()
+        # 全选并移动
+        await self.move_to_warehouse("go_group", "宝库")
+
+        # 设置地城时间
         await self.set_dungeon_time()
 
         # 切换到下一个英雄
@@ -943,9 +915,6 @@ class WoDAutomation:
             except Exception as e:
                 # 记录错误日志
                 self.log("ERROR", f"处理英雄 {current_hero} 时出错: {e}")
-                # 导入 traceback 模块
-                import traceback
-                # 打印异常堆栈
                 traceback.print_exc()
                 # 出错后仍然尝试切换到下一个英雄
                 try:
@@ -975,10 +944,9 @@ class WoDAutomation:
         except Exception as e:
             # 记录错误日志
             self.log("ERROR", f"执行出错: {e}")
-            # 导入 traceback 模块
-            import traceback
-            # 打印异常堆栈
             traceback.print_exc()
+        finally:
+            await self.close()
 
 
 # 异步函数：执行一次任务
@@ -986,8 +954,11 @@ async def run_once():
     """执行一次任务"""
     # 创建自动化对象
     automation = WoDAutomation()
-    # 运行自动化任务
-    await automation.run()
+    try:
+        # 运行自动化任务
+        await automation.run()
+    finally:
+        await automation.close()
 
 
 # 函数：定时执行任务
