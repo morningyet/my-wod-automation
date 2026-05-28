@@ -97,6 +97,46 @@ class WoDAutomation:
         # 额外等待指定秒数，确保页面稳定
         await asyncio.sleep(extra_wait)
 
+    async def ensure_page_valid(self, retry_times=3):
+        """确保页面有效，如果检测到错误页面则刷新
+
+        检测以下错误情况：
+        - 页面标题包含"无法访问此页面"
+        - URL 以 chrome-error:// 或 edge-error:// 开头
+        - 页面内容包含"已重置连接"
+        """
+        for i in range(retry_times):
+            # 检查是否为错误页面
+            is_error = await self.page.evaluate("""() => {
+                const title = document.title;
+                const url = window.location.href;
+                const bodyText = document.body.textContent;
+
+                // 检查标题
+                if (title.includes("无法访问此页面")) return true;
+                // 检查 URL
+                if (url.startsWith("chrome-error://")) return true;
+                if (url.startsWith("edge-error://")) return true;
+                // 检查页面内容
+                if (bodyText.includes("已重置连接")) return true;
+                return false;
+            }""")
+
+            if not is_error:
+                # 页面正常，直接返回
+                return True
+
+            # 检测到错误页面，记录日志并刷新
+            self.log("WARNING", f"检测到错误页面，尝试刷新 ({i+1}/{retry_times})...")
+            self.log("WARNING", f"  当前 URL: {self.page.url}")
+            self.log("WARNING", f"  当前标题: {await self.page.title()}")
+
+            await self.page.reload(wait_until="domcontentloaded", timeout=60000)
+            await self.wait_for_page(extra_wait=2)
+
+        # 重试次数用尽，抛出异常
+        raise Exception("页面持续加载失败，请检查网络连接")
+
     async def navigate_to_items(self):
         """导航到物品页面并等待加载完成"""
         # 记录导航日志
@@ -110,21 +150,23 @@ class WoDAutomation:
 
     async def _has_login_form(self):
         """统一检测页面是否有登录表单，返回表单信息字典"""
-        # 检查是否存在用户名输入框
-        has_username = await self.page.locator('input[name="login_name"]').count() > 0
-        # 检查是否存在密码输入框
-        has_password = await self.page.locator('input[name="login_password"]').count() > 0
-        # 检查是否存在提交按钮
-        has_submit = await self.page.locator('input[type="submit"], button[type="submit"]').count() > 0
+        # 检查是否存在用户名输入框（使用 ID 精确定位，避免匹配到 hidden 字段）
+        has_username = await self.page.locator('input#USERNAME[type="text"]').count() > 0
+        # 检查是否存在密码输入框（使用 ID 精确定位，避免匹配到 hidden 字段）
+        has_password = await self.page.locator('input#PASSWORT[type="password"]').count() > 0
+        # 检查是否存在登录按钮（WoD 登录按钮特征）
+        has_login_button = await self.page.locator('input[name="LOGIN_BUTTON"][value="登陆"]').count() > 0
 
         # 构建返回结果字典
+        # 两个规则满足一个即可：
+        # 规则1：有用户名+密码输入框
+        # 规则2：有登录按钮
         result = {
-            # 三个条件都满足才认为有登录表单
-            "has_form": has_username and has_password and has_submit,
+            "has_form": (has_username and has_password) or has_login_button,
             # 用户名输入框定位器（用于后续填入）
-            "username_input": self.page.locator('input[name="login_name"]').first if has_username else None,
+            "username_input": self.page.locator('input#USERNAME[type="text"]').first if has_username else None,
             # 密码输入框定位器（用于后续填入）
-            "password_input": self.page.locator('input[name="login_password"]').first if has_password else None,
+            "password_input": self.page.locator('input#PASSWORT[type="password"]').first if has_password else None,
             # 用户名输入框当前值（自动填充检测）
             "username_value": "",
             # 密码输入框当前值（自动填充检测）
@@ -152,6 +194,8 @@ class WoDAutomation:
     # 异步方法：检查是否已登录
     async def is_logged_in(self):
         """检查是否已登录"""
+        # 确保页面有效
+        await self.ensure_page_valid()
         # 等待页面加载完成，额外等待 3 秒
         await self.wait_for_page(extra_wait=3)
 
@@ -239,7 +283,8 @@ class WoDAutomation:
         """登录 WoD"""
         # 打印开始登录的日志
         self.log("INFO", "开始登录...")
-
+        # 确保页面有效
+        await self.ensure_page_valid()
         # 等待页面加载完成
         await self.wait_for_page()
 
@@ -289,10 +334,15 @@ class WoDAutomation:
             # 等待 1 秒，确保填入完成
             await asyncio.sleep(1)
 
+        # 选择世界
+        self.log("INFO", "选择世界: 4 Delta")
+        await self.page.locator('select#world').select_option("CD")
+        await asyncio.sleep(0.5)
+
         # 打印点击登录按钮的日志
         self.log("INFO", "点击登录按钮...")
-        # 找到第一个提交按钮并点击
-        await self.page.locator('input[type="submit"], button[type="submit"]').first.click()
+        # 点击登录按钮（使用精确选择器）
+        await self.page.locator('input[name="LOGIN_BUTTON"][value="登陆"]').click()
 
         # 等待登录后的页面加载完成，额外等待 3 秒
         await self.wait_for_page(extra_wait=3)
@@ -591,6 +641,8 @@ class WoDAutomation:
     # 异步方法：筛选耗材物品
     async def filter_consumables(self):
         """筛选耗材物品"""
+        # 确保页面有效
+        await self.ensure_page_valid()
         # 记录正在筛选耗材的日志
         self.log("INFO", "正在筛选耗材...")
         try:
@@ -680,6 +732,8 @@ class WoDAutomation:
 
     async def select_all_and_move_to_warehouse(self):
         """全选并移动到团队仓库"""
+        # 确保页面有效
+        await self.ensure_page_valid()
         # 记录正在全选并移动的日志
         self.log("INFO", "正在全选并移动到团队仓库...")
         # 步骤1：点击第一个复选框（全选），如果没有物品则直接返回
@@ -747,6 +801,8 @@ class WoDAutomation:
     # 异步方法：切换到下一个英雄
     async def switch_to_next_hero(self):
         """切换到下一个英雄"""
+        # 确保页面有效
+        await self.ensure_page_valid()
         # 记录正在切换英雄的日志
         self.log("INFO", "正在切换到下一个英雄...")
         try:
