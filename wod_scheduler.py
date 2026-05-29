@@ -716,7 +716,6 @@ class WoDAutomation:
     async def _click_first_checkbox(self):
         """点击位置列全选复选框，返回是否成功"""
         # 记录正在点击全选复选框的日志
-        self.log("INFO", "正在点击全选位置复选框...")
         try:
             # 使用 XPath 精确定位 thead 中的位置列全选框
             # thead 和 tfoot 都有同名复选框，需要指定 thead
@@ -727,7 +726,6 @@ class WoDAutomation:
                 await checkbox.click()
                 await self.wait_for_page(extra_wait=1)
                 # 记录点击成功的日志
-                self.log("INFO", "全选位置复选框点击完成")
                 # 返回 True 表示成功
                 return True
             else:
@@ -744,18 +742,18 @@ class WoDAutomation:
     async def move_to_warehouse(self, target, target_name):
         """全选并移动到指定仓库"""
         self.log("INFO", f"准备将选中物品移动到{target_name}")
-        self.log("INFO", "全选")
+        self.log("INFO", ">>>全选")
         if not await self._click_first_checkbox():
             self.log("INFO", f"没有可操作的物品，跳过移动到{target_name}")
             return
         await self.wait_for_page(extra_wait=0.5)
 
-        self.log("INFO", "移动...")
+        self.log("INFO", ">>>移动...")
         await self.page.wait_for_selector('thead select[name="dummy"]', timeout=30000)
         await self.page.locator('thead select[name="dummy"]').select_option(target)
         await self.wait_for_page(extra_wait=0.5)
-
-        self.log("INFO", "应用...")
+        
+        self.log("INFO", ">>>应用...")
         await self.page.wait_for_selector('input[value="应用改动"]', timeout=30000)
         await self.page.locator('input[value="应用改动"]').first.click()
         await self.wait_for_page(extra_wait=2)
@@ -805,7 +803,7 @@ class WoDAutomation:
             self.log("INFO", "  -> 跳过设置地城时间: 无减少时间按钮")
             return
 
-        # 获取 onclick 属性并提取 AJAX URL
+        # 获取 onclick 属性中的 URL 并发送 AJAX 请求用于日志
         onclick = await btn.get_attribute("onclick", timeout=2000)
         match = re.search(r"ajaxFetchUrl\(\s*'([^']+)'", onclick)
         if match:
@@ -817,10 +815,7 @@ class WoDAutomation:
             else:
                 self.log("INFO", f"  -> AJAX 响应(前500字符): {result[:500]}")
 
-            self.log("INFO", "  -> 刷新当前页面")
-            # 刷新当前页面
-            await self.page.reload(wait_until="domcontentloaded")
-        # 等待页面更新
+        await btn.click()
         await self.wait_for_page(extra_wait=1)
 
         # 检查页面元素是否有变化
