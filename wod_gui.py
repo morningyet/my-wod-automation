@@ -222,10 +222,10 @@ class WoDGUI:
 
         # 创建间隔设置
         ctk.CTkLabel(control_row, text="间隔:").pack(side="left", padx=(0, 3))
-        self.interval_entry = ctk.CTkEntry(control_row, width=50, placeholder_text="4")
-        self.interval_entry.insert(0, "4")
+        self.interval_entry = ctk.CTkEntry(control_row, width=60, placeholder_text="240")
+        self.interval_entry.insert(0, "240")
         self.interval_entry.pack(side="left", padx=(0, 3))
-        ctk.CTkLabel(control_row, text="小时").pack(side="left")
+        ctk.CTkLabel(control_row, text="分钟").pack(side="left")
 
         # 创建下次执行时间标签
         self.lbl_next_run = ctk.CTkLabel(
@@ -520,7 +520,7 @@ class WoDGUI:
             # 更新按钮文本为"停止定时"
             self.btn_schedule.configure(text="停止定时")
             # 记录定时任务启动的日志
-            self.log("INFO", f"定时任务已启动，间隔 {interval} 小时")
+            self.log("INFO", f"定时任务已启动，间隔 {interval} 分钟")
 
             # 计算并显示下次执行时间
             self._update_next_run_time(interval)
@@ -528,8 +528,8 @@ class WoDGUI:
             # 立即执行一次收菜
             self.start_harvest()
 
-            # 设置下一次执行的定时器（将小时转换为毫秒，转为整数）
-            self._schedule_next(int(interval * 3600 * 1000))
+            # 设置下一次执行的定时器（分钟转换为毫秒）
+            self._schedule_next(int(interval * 60 * 1000))
 
         # 如果出现值错误异常
         except ValueError as e:
@@ -564,19 +564,18 @@ class WoDGUI:
                 interval = float(self.interval_entry.get())
                 # 计算并显示下次执行时间
                 self._update_next_run_time(interval)
-                # 设置下一次定时器（转为整数）
-                self._schedule_next(int(interval * 3600 * 1000))
+                # 设置下一次定时器（分钟转毫秒）
+                self._schedule_next(int(interval * 60 * 1000))
             # 如果出现异常
             except:
                 # 停止定时任务
                 self.stop_schedule()
 
     # 更新下次执行时间显示
-    def _update_next_run_time(self, interval_hours):
+    def _update_next_run_time(self, interval_minutes):
         """更新下次执行时间显示"""
         import datetime
-        # 计算下次执行时间
-        next_time = datetime.datetime.now() + datetime.timedelta(hours=interval_hours)
+        next_time = datetime.datetime.now() + datetime.timedelta(minutes=interval_minutes)
         # 格式化时间为 HH:MM:SS
         time_str = next_time.strftime("%H:%M:%S")
         # 更新标签

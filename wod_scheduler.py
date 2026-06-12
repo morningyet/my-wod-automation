@@ -962,13 +962,13 @@ async def run_once():
 # 函数：定时执行任务
 def run_scheduled():
     """定时执行任务"""
-    # 每 4 小时执行一次
-    schedule.every(4).hours.do(lambda: asyncio.run(run_once()))
+    # 每 240 分钟执行一次
+    schedule.every(240).minutes.do(lambda: asyncio.run(run_once()))
 
     # 记录定时任务已启动的日志
-    logger.info("定时任务已启动，每4小时执行一次...")
+    logger.info("定时任务已启动，每240分钟执行一次...")
     # 记录首次立即执行的日志
-    logger.info("首次立即执行，然后每4小时执行一次")
+    logger.info("首次立即执行，然后每240分钟执行一次")
     # 记录停止方式的日志
     logger.info("按 Ctrl+C 停止")
 
