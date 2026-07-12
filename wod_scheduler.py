@@ -24,8 +24,6 @@ from dotenv import load_dotenv
 # 加载 .env 文件，获取环境变量
 load_dotenv(os.path.join(os.path.dirname(__file__), '.env'))
 
-# 配置常量：Edge 浏览器路径
-EDGE_PATH = r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
 # 配置常量：调试端口号
 DEBUG_PORT = 9222
 # 配置常量：WoD 物品页面 URL
@@ -386,7 +384,7 @@ class WoDAutomation:
         # 第一阶段：连接浏览器
         try:
             # 记录尝试连接到调试端口的日志
-            logger.info(f"尝试连接到 Edge 调试端口 http://localhost:{DEBUG_PORT}")
+            logger.info(f"尝试连接到浏览器调试端口 http://localhost:{DEBUG_PORT}")
             # 启动 Playwright
             self.playwright = await async_playwright().start()
             # 通过 CDP 连接到浏览器
@@ -394,15 +392,15 @@ class WoDAutomation:
                 f"http://localhost:{DEBUG_PORT}"
             )
             # 记录连接成功的日志
-            self.log("INFO", "已连接到 Edge 浏览器")
+            self.log("INFO", "已连接到浏览器")
         # 如果连接过程中出现异常
         except Exception as e:
             # 记录连接失败的日志
             self.log("ERROR", f"连接浏览器失败: {e}")
             # 提示用户确保浏览器已启动
-            self.log("ERROR", f"  请确保 Edge 浏览器已用 --remote-debugging-port={DEBUG_PORT} 启动")
+            self.log("ERROR", f"  请确保浏览器已用 --remote-debugging-port={DEBUG_PORT} 启动")
             # 提示启动命令
-            self.log("ERROR", f"  启动命令: msedge.exe --remote-debugging-port={DEBUG_PORT}")
+            self.log("ERROR", f"  启动命令: <浏览器路径> --remote-debugging-port={DEBUG_PORT}")
             # 重新抛出异常
             raise
 
