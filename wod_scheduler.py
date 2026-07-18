@@ -401,6 +401,10 @@ class WoDAutomation:
             self.log("ERROR", f"  请确保浏览器已用 --remote-debugging-port={DEBUG_PORT} 启动")
             # 提示启动命令
             self.log("ERROR", f"  启动命令: <浏览器路径> --remote-debugging-port={DEBUG_PORT}")
+            # 【防内存泄漏】连接失败时也要释放已启动的 playwright（它会调
+            # playwright.stop() 终止 Node.js 驱动子进程），否则每次失败的连接
+            # 都会留下一个僵尸 Node 进程。
+            await self.close()
             # 重新抛出异常
             raise
 

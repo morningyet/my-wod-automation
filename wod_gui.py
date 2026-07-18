@@ -351,11 +351,14 @@ class WoDGUI:
         # 定义异步连接函数
         async def do_connect():
             try:
-                # 清理旧连接
-                if self.automation and self.automation.browser:
+                # 清理旧连接：统一用 close() 释放（内部会调用 playwright.stop()
+                # 终止 Node.js 驱动进程，避免内存泄漏）。
+                # 注意：不能调用 browser.close()——connect_over_cdp 返回的 browser
+                # 一旦 close() 会把用户正在使用的整个浏览器也一起关掉。
+                if self.automation:
                     try:
-                        await self.automation.browser.close()
-                    except:
+                        await self.automation.close()
+                    except Exception:
                         pass
                 # 创建自动化对象，传入日志回调和自动登录标志
                 self.automation = WoDAutomation(log_callback=self.log, auto_login=self.auto_login)
@@ -415,6 +418,14 @@ class WoDGUI:
             try:
                 # 每次收菜都重新连接，避免长时间未操作导致网页会话断开
                 self.log("INFO", "正在连接浏览器...")
+                # 【防内存泄漏】先关闭上一次的自动化对象：async_playwright().start()
+                # 会派生一个 Node.js 驱动子进程，若不调用 close()→playwright.stop()，
+                # 旧进程会一直挂在后台，多次定时运行后 Node 进程堆积导致内存暴涨。
+                if self.automation:
+                    try:
+                        await self.automation.close()
+                    except Exception:
+                        pass
                 self.automation = WoDAutomation(log_callback=self.log, auto_login=True)
                 await self.automation.connect()
 
