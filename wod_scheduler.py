@@ -587,11 +587,13 @@ class WoDAutomation:
         await self.wait_for_page(extra_wait=1)
 
         # 获取需要丢弃的数量
+        # 注意：只用"不得不抛弃N件物品"这一段来提取，避免依赖前半句文案，
+        # 也避免 document.body.textContent 含换行使正则的 .* 跨不过去而失配。
         need_drop = await self.page.evaluate("""() => {
             const body = document.body.textContent;
-            const match = body.match(/您在地城冒险中找到(\\d+)件物品.*不得不抛弃(\\d+)件物品/);
+            const match = body.match(/不得不抛弃(\\d+)件物品/);
             if (match) {
-                return parseInt(match[2]);
+                return parseInt(match[1]);
             }
             return 0;
         }""")
