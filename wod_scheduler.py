@@ -583,6 +583,7 @@ class WoDAutomation:
             await self.wait_for_page(extra_wait=2)
 
         # 第9步：回到第一页，读取页面信息
+        self.log("INFO", "两次清理完成，回到第一页查看是否仍需丢弃物品")
         await self.page.click('input[name="ITEMS_GEFUNDEN_PAGE[1]"]')
         await self.wait_for_page(extra_wait=1)
 
@@ -605,7 +606,7 @@ class WoDAutomation:
         self.log("INFO", f"需要丢弃{need_drop}件物品")
 
         # 第10步：从下向上选择N件物品
-        await self.page.evaluate(f"""() => {{
+        picked = await self.page.evaluate(f"""() => {{
             const paragraphs = document.querySelectorAll("p");
             let targetParagraph = null;
             for (let p of paragraphs) {{
@@ -633,13 +634,23 @@ class WoDAutomation:
                 }}
             }});
 
+            const picked = [];
             for (let i = 1; i <= {need_drop} && i <= rowsWithCheckbox.length; i++) {{
                 const item = rowsWithCheckbox[rowsWithCheckbox.length - i];
                 item.checkbox.checked = true;
+                const rowText = (item.checkbox.closest("tr")?.textContent || "").replace(/\\s+/g, " ").trim();
+                picked.push({{ index: rowsWithCheckbox.length - i, name: item.name, text: rowText }});
             }}
 
-            return rowsWithCheckbox.length;
+            return picked;
         }}""")
+
+        if picked:
+            self.log("INFO", f"从下往上勾选了 {len(picked)} 件物品：")
+            for idx, item in enumerate(picked, 1):
+                self.log("INFO", f"  {idx}. [序号{item.get('index')}] {item.get('text', '')}")
+        else:
+            self.log("WARNING", f"未能勾选任何物品（need_drop={need_drop}）")
 
         # 第11步：点击应用改动
         self.log("INFO", "点击应用改动")
