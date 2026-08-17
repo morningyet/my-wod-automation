@@ -1,0 +1,99 @@
+====================================================================
+              my-wod-automation / js 目录功能分析
+====================================================================
+
+概述
+----
+本目录包含 8 个 Tampermonkey（油猴）用户脚本，全部服务于
+World of Dungeons（WoD）网页游戏。仓库托管在 Gitee 上，作为
+油猴脚本的 @updateURL / @downloadURL 分发源。
+
+脚本来源分为两类：
+  1. 继承自 Christophero / DotIN13 / Jim Zhai / 1iuh 的开源脚本
+  2. morningyet（本人）自己编写或修改的脚本
+
+
+目录结构总览
+----
+  脚本文件                                                      大小    主要作用域
+  ------------------------------------------------------------  ------  --------------------
+  userItem/WoD-userItem.user.js                                1105行  物品页 / 仓库
+  物品页面增强/WoD 物品页面增强.user.js                        2211行  物品详情页
+  Wod掉落分析/WoD 掉落分析.user.js                             674行   地牢报告页
+  物品标记/WoD 物品标记.user.js                                327行   物品列表页
+  BattleConfigEnhance/WoDBattleConfigEnhance.user.js           347行   战斗设置页
+  autoCompletion/autoCompletion.js                             83行    全站表单
+  morning-tools/morning tool.js                               155行   报告 / 交易 / 物品页
+
+
+各脚本详细功能
+----
+
+【1】userItem/WoD-userItem.user.js —— 物品批量存放仓库（核心脚本）
+    作者 lax-Christophero，modifier 为 morningyet。
+    核心能力：
+    - 批量移动物品：在 warehouse（仓库）/ treasury（宝库）/
+      storage（地窖）之间批量转移物品（placeMap 映射目标位置）。
+    - 特殊物品保护机制：
+      * reserveItems 硬编码了一长串「不能直接 N 掉但也不高亮」的
+        物品名单（各类卷轴、护符、材料等）。
+      * 通过 localStorage 的 specialItems 键持久化用户自定义的特殊
+        物品，支持版本号（specialItemsVersion）、高亮开关
+        （specialItemsShine）、是否允许出售（specialItemsAllowSell）。
+      * specialItems_backup.json 是特殊物品名单的备份文件。
+    - 处理「不可装备物品」（deal_with_unequipable）。
+
+【2】物品页面增强/WoD 物品页面增强.user.js —— 物品详情页信息聚合（最大脚本）
+    物品详情页（item.php，含英雄 / 公会 / 新闻 / 主页）增强：
+    - 掉落分析（dropAnalysis）
+    - 套装模拟直达（simulateSuit）
+    - 纪念碑兑换券直达链接（gotoMonument）
+    - 失效物品分类替换为查询地址（replaceCategory）
+    - 幸运符 / 魔法物品 / 神名拼字物品加成解析
+      （explainLuckyItem / explainMagicItem / explainDivineNamePrefixItem）
+    - 从团仓 / 宝库一键添加物品到仓库（obtainItemAuto）
+    - 上报彩票抽奖信息（reportDraws）
+    - 展示物品获取途径、当前团队掉落数、最近拍卖信息、历史掉落信息。
+
+【3】Wod掉落分析/WoD 掉落分析.user.js —— 地牢掉落分析
+    在 delta.world-of-dungeons.org 的地牢报告页（report.php）运行，
+    webpack 打包（含 nanobar 进度条库）。依赖 axios + GM.xmlHttpRequest，
+    连接 www.wodgroup.top 和 www.christophero.xyz 上报 / 获取掉落数据，
+    做掉落统计与进度条展示。
+
+【4】物品标记/WoD 物品标记.user.js —— 自定义颜色标记
+    在物品列表页（items.php）给物品打上自定义颜色标记
+    （蓝 / 绿 / 红 / 橙四色），配置存 localStorage（MARK_ITEM_OPTION_KEY）。
+    用途：被标记的物品「很大概率会被处理给钱袋」（即标记待处理 / 出售）。
+    支持导出 / 导入配置（CSV）。依赖 slim-select 库做下拉选择。
+
+【5】BattleConfigEnhance/WoDBattleConfigEnhance.user.js —— 战斗设置增强
+    在战斗技能配置页（skillconf）运行。通过 monkey-patch 游戏原生的
+    WodUiList / WodUiActionList 类：
+    - 补丁 moveTo 方法，实现动作项在列表中任意位置移动。
+    - 增加 insertAction 方法，在列表指定位置插入动作。
+    - 配合自定义按钮样式，增强配置页操作体验。
+
+【6】autoCompletion/autoCompletion.js —— 表单自动补全
+    全站（/wod/*，排除 skillconf）运行。用 select2 库把选项中数量
+    超过 13 个的下拉框（select）替换成可搜索的自动补全组件。针对
+    「物品类型」和「技能加成」选择器优化，忽略 EquipItem[] 和
+    sndgrp[] 字段。
+
+【7】morning-tools/morning tool.js —— 战报过滤 + 下拉排序
+    morningyet 自己的工具箱，三个页面生效：
+    - 战报过滤（filterReport）：在地牢报告 / 竞技场决斗页，给每个英雄
+      加 checkbox，勾选后可按英雄筛选战报，只显示选中英雄的行动。
+    - 下拉排序（reorderMain）：对物品类型（item_class）和套装（set）
+      下拉框按中文拼音排序（zh-CN-u-co-pinyin）。
+
+
+备注
+----
+- git status 显示当前 WoD-userItem.user.js 有未提交修改。
+- 以下目录 / 文件为未跟踪（??）的新增内容：
+  * js/Wod掉落分析/
+  * js/morning-tools/
+  * js/物品标记/
+  * js/物品页面增强/
+  * report/
