@@ -10,7 +10,7 @@
 // @require      https://cdn.jsdelivr.net/npm/axios-userscript-adapter@0.1.4/dist/axiosGmxhrAdapter.min.js
 // @grant        GM.xmlHttpRequest
 // @connect      www.wodgroup.top
-// @connect      www.christophero.xyz
+// @connect      christophero.xyz
 // @modifier     Christophero
 // @version      2023.03.24.1
 // @updateURL    https://gitee.com/christophero/wod-scripts/raw/master/wod/WoD%20%E6%8E%89%E8%90%BD%E5%88%86%E6%9E%90.user.js
@@ -389,7 +389,13 @@
                     "，请勿关闭网页。"
                 );
                 var payload = ReadPage(temp_div);
-                const res = post(globalUploadUrl, payload);
+                post(globalUploadUrl, payload)
+                  .then((res) => {
+                    showUploadLog({ ok: true, url: globalUploadUrl, payload, res });
+                  })
+                  .catch((err) => {
+                    showUploadLog({ ok: false, url: globalUploadUrl, payload, err });
+                  });
                 curr_num += 1;
                 var process_val = Math.min(
                   100,
@@ -450,8 +456,153 @@
           exportAll();
         }
         function exportAllDropsMyself() {
-          globalUploadUrl = "https://www.christophero.xyz/wod/reportUpload";
+          globalUploadUrl = "https://christophero.xyz/wod/reportUpload";
           exportAll();
+        }
+
+        // 上传日志记录（完整保留，供导出/重放）
+        let uploadLogs = [];
+
+        function ensureLogPanel() {
+          if ($("#upload_log_panel").length) return;
+          $(
+            '<div id="upload_log_panel" style="clear:both;margin-top:8px;max-height:480px;overflow:auto;' +
+            'border:1px solid #444;background:#111;padding:8px;font-size:12px;">' +
+            '  <div style="margin-bottom:6px;">' +
+            '    <span id="upload_log_summary" style="color:#0f0;font-weight:bold;"></span>' +
+            '    <input type="button" id="export_log_btn" value="导出日志" class="button clickable" style="float:right;">' +
+            '    <input type="button" id="replay_log_btn" value="重放日志" class="button clickable" style="float:right;margin-right:5px;">' +
+            '  </div>' +
+            '  <div id="upload_log_list"></div>' +
+            '  <input type="file" id="replay_file_input" accept=".txt" style="display:none;">' +
+            '</div>'
+          ).insertAfter("#progress_bar");
+
+          $("#export_log_btn").on("click", exportLog);
+          $("#replay_log_btn").on("click", function () {
+            $("#replay_file_input").trigger("click");
+          });
+          $("#replay_file_input").on("change", function (e) {
+            const file = e.target.files[0];
+            if (file) handleReplayFile(file);
+            $(this).val("");
+          });
+        }
+
+        function showUploadLog({ ok, url, payload, res, err }) {
+          ensureLogPanel();
+          const status = res ? res.status : "网络错误";
+          let resData;
+          try {
+            resData = res ? res.data : (err && err.message) || String(err);
+          } catch (e) {
+            resData = String(err);
+          }
+
+          uploadLogs.push({
+            url,
+            payload,
+            ok,
+            status,
+            resData,
+            ts: new Date().toLocaleString(),
+          });
+
+          $("#upload_log_summary").text(
+            `上传进度：成功 ${uploadLogs.filter((l) => l.ok).length} / 失败 ${
+              uploadLogs.filter((l) => !l.ok).length
+            }  （${url}）`
+          );
+
+          const dropsHtml = payload.drops
+            .map(
+              (d) =>
+                `<span style="color:#9cf">${d.item_name}</span><span style="color:#666">←${d.charname}</span>`
+            )
+            .join("、");
+
+          let respText;
+          try {
+            respText = JSON.stringify(resData, null, 2);
+          } catch (e) {
+            respText = String(resData);
+          }
+
+          const row = $(
+            `<details style="margin:4px 0;border-left:3px solid ${ok ? "#0a0" : "#a00"};padding-left:6px;">` +
+            `  <summary style="cursor:pointer;color:${ok ? "#0f0" : "#f00"}">` +
+            `    #${uploadLogs.length} ${payload.map_name}（${payload.datetime}）掉 ${payload.drops.length} 件 · HTTP ${status} · ${ok ? "成功" : "失败"}` +
+            `  </summary>` +
+            `  <div style="margin:6px 0 0 8px;">` +
+            `    <div><b>入参 drops：</b>${dropsHtml}</div>` +
+            `    <div style="color:#999"><b>form_data：</b><span style="word-break:break-all">${payload.form_data}</span></div>` +
+            `    <div><b>返回值：</b><pre style="white-space:pre-wrap;color:#9cf;margin:2px 0">${respText}</pre></div>` +
+            `  </div>` +
+            `</details>`
+          );
+          $("#upload_log_list").prepend(row);
+        }
+
+        function exportLog() {
+          if (!uploadLogs.length) {
+            alert("暂无上传日志，请先点击「全量统计」或「联盟全量统计」。");
+            return;
+          }
+          const head =
+            "# WoD 掉落分析 · 上传日志\n" +
+            "# 说明：以 # 开头的为注释行；其余每行一条 JSON（可重放）\n" +
+            "# 重放：点击「重放日志」选择本文件，脚本会按每条记录里的 url 重新 POST payload\n\n";
+          const jsonLines = uploadLogs.map((l) => JSON.stringify(l)).join("\n");
+          const blob = new Blob(["\ufeff" + head + jsonLines], {
+            type: "text/plain;charset=utf-8;",
+          });
+          const a = document.createElement("a");
+          a.href = URL.createObjectURL(blob);
+          a.download = "上传日志.txt";
+          a.click();
+          URL.revokeObjectURL(a.href);
+        }
+
+        function handleReplayFile(file) {
+          const reader = new FileReader();
+          reader.onload = function (e) {
+            const lines = String(e.target.result).split("\n");
+            let replayed = 0;
+            for (const line of lines) {
+              const trimmed = line.trim();
+              if (!trimmed || trimmed.startsWith("#")) continue;
+              try {
+                const entry = JSON.parse(trimmed);
+                if (!entry || !entry.url || !entry.payload) continue;
+                post(entry.url, entry.payload)
+                  .then((res) => {
+                    showUploadLog({
+                      ok: true,
+                      url: entry.url,
+                      payload: entry.payload,
+                      res,
+                    });
+                  })
+                  .catch((err) => {
+                    showUploadLog({
+                      ok: false,
+                      url: entry.url,
+                      payload: entry.payload,
+                      err,
+                    });
+                  });
+                replayed += 1;
+              } catch (parseErr) {
+                // 跳过无法解析的行
+              }
+            }
+            if (replayed) {
+              alert(`开始重放 ${replayed} 条日志，结果将追加到上方日志区。`);
+            } else {
+              alert("未从文件中解析到可重放的日志（需为「导出日志」生成的 txt）。");
+            }
+          };
+          reader.readAsText(file, "utf-8");
         }
 
         function addMarkClass() {
@@ -508,7 +659,7 @@
 
         function fetchSpecialItems() {
           // 获取特殊物品信息
-          fetch("https://www.christophero.xyz/wod/item/loadDict", {
+          fetch("https://christophero.xyz/wod/item/loadDict", {
             method: "POST",
             body: JSON.stringify({ dictTypeList: ["specialItems"] }),
             headers: {
@@ -577,7 +728,7 @@
             const groups = reg.exec(title);
             if (groups) {
               window.open(
-                `https://www.christophero.xyz/groupDungeon/${encodeURIComponent(
+                `https://christophero.xyz/groupDungeon/${encodeURIComponent(
                   groups[2]
                 )}?groupId=${groupId}`,
                 "_blank"
@@ -640,12 +791,12 @@
           });
           $("#goto_union_drops_table").on("click", function () {
             window.open(
-              `https://www.christophero.xyz/groupDungeon?groupId=${group_id}`,
+              `https://christophero.xyz/groupDungeon?groupId=${group_id}`,
               "_blank"
             );
           });
           $("#goto_all_items").on("click", function () {
-            window.open(`https://www.christophero.xyz/itemList`, "_blank");
+            window.open(`https://christophero.xyz/itemList`, "_blank");
           });
           return;
         }
@@ -656,7 +807,7 @@
           post("http://www.wodgroup.top/upload", payload).then((res) => {
             console.log(res);
           });
-          post("https://www.christophero.xyz/wod/reportUpload", payload).then(
+          post("https://christophero.xyz/wod/reportUpload", payload).then(
             (res) => {
               console.log(res);
             }

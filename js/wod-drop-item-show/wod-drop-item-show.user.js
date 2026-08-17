@@ -10,7 +10,7 @@
 // @include        http*://*.world-of-dungeons.org/
 // @license        MIT License
 // @require        https://code.jquery.com/jquery-3.3.1.min.js
-// @connect        www.christophero.xyz
+// @connect        christophero.xyz
 // @modifier       Christophero
 // @version        2023.06.04.1
 // @updateURL      https://gitee.com/christophero/wod-scripts/raw/master/wod/WoD%20%E7%89%A9%E5%93%81%E9%A1%B5%E9%9D%A2%E5%A2%9E%E5%BC%BA.user.js
@@ -84,7 +84,7 @@
       $latestPriceList.each(function () {
         priceList.push($(this).text());
       });
-      fetch("https://www.christophero.xyz/wod/item/reportDraws", {
+      fetch("https://christophero.xyz/wod/item/reportDraws", {
         method: "POST",
         headers: {
           "User-Agent": "Apipost client Runtime/+https://www.apipost.cn/",
@@ -170,22 +170,109 @@
   }
 
   /**
+   * 渲染接口调试块（参照掉落分析日志区样式：入参 + 返回值）
+   */
+  function renderDropDebugTd($td, tip, httpStatus, reqUrl, reqBody, resData) {
+    let respText;
+    try {
+      respText = JSON.stringify(resData, null, 2);
+    } catch (e) {
+      respText = String(resData);
+    }
+    let reqText;
+    try {
+      reqText = JSON.stringify(reqBody, null, 2);
+    } catch (e) {
+      reqText = String(reqBody);
+    }
+    $td.empty().append(
+      $(
+        `<details style="text-align:left;background:#111;color:#ccc;padding:4px 8px;border-left:3px solid #a00;">` +
+          `<summary style="cursor:pointer;color:#f44;">${tip} · HTTP ${httpStatus}</summary>` +
+          `<div style="margin-top:4px;"><b>请求：</b>POST ${reqUrl}</div>` +
+          `<div><b>入参：</b><pre style="color:#9cf;white-space:pre-wrap;margin:2px 0;">${reqText}</pre></div>` +
+          `<div><b>返回值：</b><pre style="color:#9cf;white-space:pre-wrap;margin:2px 0;">${respText}</pre></div>` +
+          `</details>`
+      )
+    );
+  }
+
+  /**
+   * 填充掉落列表；无数据时显示接口请求与返回值
+   */
+  function fillDropTd($td, dropList, httpStatus, reqUrl, reqBody, resData) {
+    if (dropList && dropList.length) {
+      $td.empty();
+      for (let drop of dropList) {
+        $td.append(
+          `<div> 于${timeStamp2String(drop.dropTime)} 在地城 [${drop.dungeonName}](${drop.minLevel}-${drop.maxLevel}) 确认掉落 <div>`
+        );
+      }
+    } else {
+      renderDropDebugTd($td, "无数据", httpStatus, reqUrl, reqBody, resData);
+    }
+  }
+
+  /**
    * 掉落分析，本脚本最强大功能，分析物品出处，出货量，获取条件等
    */
   function dropAnalysis() {
     const groupId = $('input[name="gruppe_id"]').val();
-    fetch("https://www.christophero.xyz/wod/item/dropAnalysis", {
+    const dropAnalysisUrl = "https://christophero.xyz/wod/item/dropAnalysis";
+    const dropAnalysisReq = { name, groupId, notExistInsert: true };
+    const $tbody = $("#details table.content_table>tbody");
+    // 行样式需在骨架插入前计算（骨架插入后 tr:last 已变化）
+    let rowClass = "row1";
+    const lastClass = $tbody.find("tr:last").attr("class");
+    if (lastClass == "row1") {
+      rowClass = "row0";
+    }
+
+    // 先渲染两个骨架框，接口返回后再填充
+    const $latestSkeletonRow = $(
+      `<tr class="${rowClass}"><td>最近5条掉落信息</td></tr>`
+    );
+    const $latestDetailTd = $('<td style="text-align: left;">查询中…</td>');
+    $latestSkeletonRow.append($latestDetailTd).appendTo($tbody);
+    const $originalSkeletonRow = $(
+      `<tr class="${lastClass}"><td>最低副本等级前5次掉落信息</td></tr>`
+    );
+    const $originalDetailTd = $('<td style="text-align: left;">查询中…</td>');
+    $originalSkeletonRow.append($originalDetailTd).appendTo($tbody);
+
+    fetch(dropAnalysisUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ name, groupId, notExistInsert: true }),
+      body: JSON.stringify(dropAnalysisReq),
     })
-      .then((response) => {
-        return response.json();
-      })
-      .then((res) => {
+      .then((response) =>
+        response.text().then((text) => [response.status, text])
+      )
+      .then(([httpStatus, text]) => {
+        let res = null;
+        try {
+          res = JSON.parse(text);
+        } catch (e) {}
+        const resData = res ? res : text;
         if (!(res && res.code === 200)) {
+          renderDropDebugTd(
+            $latestDetailTd,
+            "接口异常",
+            httpStatus,
+            dropAnalysisUrl,
+            dropAnalysisReq,
+            resData
+          );
+          renderDropDebugTd(
+            $originalDetailTd,
+            "接口异常",
+            httpStatus,
+            dropAnalysisUrl,
+            dropAnalysisReq,
+            resData
+          );
           return;
         }
         const data = res.data;
@@ -213,13 +300,6 @@
         const allyLatestDropList = data.allyLatestDropList;
         // 地城掉落数列表
         const dropCntList = data.dropCntList;
-        const $tbody = $("#details table.content_table>tbody");
-        // 添加行颜色
-        let rowClass = "row1";
-        const lastClass = $tbody.find("tr:last").attr("class");
-        if (lastClass == "row1") {
-          rowClass = "row0";
-        }
         let $tr = $("<tr></tr>");
         $tr.addClass(rowClass);
         let $labelTd = $("<td>获取途径</td>");
@@ -302,12 +382,15 @@
         if (!$contentTd.text()) {
           $contentTd.append("未能确认来源");
         }
-        $tr.append($labelTd).append($contentTd).appendTo($tbody);
+        $tr
+          .append($labelTd)
+          .append($contentTd)
+          .insertBefore($latestSkeletonRow);
         $(
           `<tr class="${lastClass}"><td>掉落数</td><td align="center">${
             count ? count : "-"
           }</td></tr>`
-        ).appendTo($tbody);
+        ).insertBefore($latestSkeletonRow);
 
         let relatedItemList = data.relatedItemList ? data.relatedItemList : [];
         const $relatedItems = $('<div style="max-width: 700px;"></div>');
@@ -319,7 +402,7 @@
         );
         $relatedItemsRow
           .append($('<td align="center"></td>').append($relatedItems))
-          .appendTo($tbody);
+          .insertBefore($latestSkeletonRow);
 
         // 增加最近的拍卖信息
         const $auctionsRow = $(
@@ -355,41 +438,27 @@
             }
           }
         }
-        $auctionsRow.append($auctionsDetailTd).appendTo($tbody);
+        $auctionsRow
+          .append($auctionsDetailTd)
+          .insertBefore($latestSkeletonRow);
 
-        const $latestRow = $(
-          `<tr class="${rowClass}"><td>最近5条掉落信息</td></tr>`
+        // 填充先行渲染的两个骨架框
+        fillDropTd(
+          $latestDetailTd,
+          latestDropList,
+          httpStatus,
+          dropAnalysisUrl,
+          dropAnalysisReq,
+          resData
         );
-        let $latestDetailTd = $("<td></td>");
-        if (!latestDropList) {
-          $latestDetailTd.append("-");
-        } else {
-          for (let drop of latestDropList) {
-            $latestDetailTd.append(
-              `<div> 于${timeStamp2String(drop.dropTime)} 在地城 [${
-                drop.dungeonName
-              }](${drop.minLevel}-${drop.maxLevel}) 确认掉落 <div>`
-            );
-          }
-        }
-        $latestRow.append($latestDetailTd).appendTo($tbody);
-
-        const $originalRow = $(
-          `<tr class="${lastClass}"><td>最低副本等级前5次掉落信息</td></tr>`
+        fillDropTd(
+          $originalDetailTd,
+          originalDropList,
+          httpStatus,
+          dropAnalysisUrl,
+          dropAnalysisReq,
+          resData
         );
-        let $originalDetailTd = $("<td></td>");
-        if (!originalDropList) {
-          $originalDetailTd.append("-");
-        } else {
-          for (let drop of originalDropList) {
-            $originalDetailTd.append(
-              `<div> 于${timeStamp2String(drop.dropTime)} 在地城 [${
-                drop.dungeonName
-              }](${drop.minLevel}-${drop.maxLevel}) 确认掉落<div>`
-            );
-          }
-        }
-        $originalRow.append($originalDetailTd).appendTo($tbody);
 
         const $maximumDropRow = $(
           `<tr class="${rowClass}"><td>记录掉落数最多的5个地城</td></tr>`
@@ -441,6 +510,25 @@
           }
           $latestAllyRow.append($latestAllyDetailTd).appendTo($tbody);
         }
+      })
+      .catch((err) => {
+        // 网络失败时，骨架框显示请求信息与错误
+        renderDropDebugTd(
+          $latestDetailTd,
+          "网络错误",
+          "-",
+          dropAnalysisUrl,
+          dropAnalysisReq,
+          String(err)
+        );
+        renderDropDebugTd(
+          $originalDetailTd,
+          "网络错误",
+          "-",
+          dropAnalysisUrl,
+          dropAnalysisReq,
+          String(err)
+        );
       });
   }
 
@@ -495,7 +583,7 @@
       }
       $this.attr({
         href:
-          "https://www.christophero.xyz/itemList?categoryName=" +
+          "https://christophero.xyz/itemList?categoryName=" +
           encodeURIComponent(categoryName),
         target: "_blank",
       });
