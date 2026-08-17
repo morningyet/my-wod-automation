@@ -13,8 +13,8 @@
 // @connect        christophero.xyz
 // @modifier       Christophero
 // @version        2023.06.04.1
-// @updateURL      https://gitee.com/christophero/wod-scripts/raw/master/wod/WoD%20%E7%89%A9%E5%93%81%E9%A1%B5%E9%9D%A2%E5%A2%9E%E5%BC%BA.user.js
-// @downloadURL    https://gitee.com/christophero/wod-scripts/raw/master/wod/WoD%20%E7%89%A9%E5%93%81%E9%A1%B5%E9%9D%A2%E5%A2%9E%E5%BC%BA.user.js
+// @updateURL      https://gitee.com/Morningyet/my-wod-automation/raw/master/js/wod-drop-item-show/wod-drop-item-show.user.js
+// @downloadURL    https://gitee.com/Morningyet/my-wod-automation/raw/master/js/wod-drop-item-show/wod-drop-item-show.user.js
 // ==/UserScript==
 
 (function () {

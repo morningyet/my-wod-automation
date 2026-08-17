@@ -7,8 +7,8 @@
 // @include			http*://*.world-of-dungeons.*/wod/spiel/tournament/*duell.php*
 // @include			http*://*.world-of-dungeons.*/wod/spiel/trade/trade.php*
 // @include			http*://*.world-of-dungeons.*/wod/spiel/hero/items.php*
-// @updateURL		https://bitbucket.org/coolmint/mywodtools/raw/master/script/WODTools.user.js
-// @downloadURL		https://bitbucket.org/coolmint/mywodtools/raw/master/script/WODTools.user.js
+// @updateURL		https://gitee.com/Morningyet/my-wod-automation/raw/master/js/morning-tools/morning%20tool.js
+// @downloadURL		https://gitee.com/Morningyet/my-wod-automation/raw/master/js/morning-tools/morning%20tool.js
 // ==/UserScript==
 (function() {
 	//filter report
