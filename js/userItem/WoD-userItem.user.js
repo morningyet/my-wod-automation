@@ -8,7 +8,7 @@
 // @require      https://code.jquery.com/jquery-3.6.0.min.js
 // @grant        none
 // @modifier     morningyet
-// @version      2026.05.23.0
+// @version      2026.08.18.0
 // @updateURL    https://gitee.com/Morningyet/my-wod-automation/raw/master/js/userItem/WoD-userItem.user.js
 // @downloadURL  https://gitee.com/Morningyet/my-wod-automation/raw/master/js/userItem/WoD-userItem.user.js
 // ==/UserScript==
@@ -77,6 +77,9 @@
     "活力皮护腿",
     "活力皮手套",
     "速度皮靴",
+    "带导线的飞镖",
+    "制作精美的月饼",
+    "阿克贝斯之泪",
     "狮心近卫勋章"
   ];
 
@@ -103,7 +106,11 @@
     ".*刻",
     "奢华.*",
     ".*平平无奇.*",
+    ".*手枪.*",
     ".*刺青",
+    ".*装有.*",
+    ".*南瓜汁",
+    ".*联盟信物"
   ];
 
   let fullHeroArr = [];
