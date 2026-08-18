@@ -12,7 +12,7 @@
 // @grant        GM_getValue
 // @grant        GM_registerMenuCommand
 // @grant        GM_addStyle
-// @version      0.3.0
+// @version      0.3.1
 // @updateURL    https://gitee.com/Morningyet/my-wod-automation/raw/master/js/wod-harvest/wod-harvest.user.js
 // @downloadURL  https://gitee.com/Morningyet/my-wod-automation/raw/master/js/wod-harvest/wod-harvest.user.js
 // @run-at       document-end
@@ -37,13 +37,14 @@
     const TASK_TIMEOUT_MS = 6 * 3600 * 1000; // 任务总超时
 
     // GM 存储键
-    const KEY_TASK = 'harvest_task';
-    const KEY_INTERVAL = 'harvest_interval_min';
-    const KEY_NEXT_RUN = 'harvest_next_run_ts';
-    const KEY_SCHED_ON = 'harvest_sched_on';
-    const KEY_OWNER = 'harvest_owner_tab';
-    const KEY_LOG = 'harvest_log';
-    const KEY_PANEL_HIDDEN = 'harvest_panel_hidden';
+    const KEY_TASK = 'harvest_task';               // 当前收菜任务状态（步骤/子状态/进度，跨页面续跑）
+    const KEY_INTERVAL = 'harvest_interval_min';   // 定时收菜间隔（分钟）
+    const KEY_NEXT_RUN = 'harvest_next_run_ts';    // 下次定时执行的时间戳
+    const KEY_SCHED_ON = 'harvest_sched_on';       // 定时收菜开关（true=已启动）
+    const KEY_OWNER = 'harvest_owner_tab';         // 任务所有权心跳（多标签页互斥，防重复执行）
+    const KEY_LOG = 'harvest_log';                 // 面板日志（最近 200 条，跨页面保留）
+    const KEY_PANEL_HIDDEN = 'harvest_panel_hidden';      // 面板整体隐藏开关（菜单里恢复）
+    const KEY_PANEL_COLLAPSED = 'harvest_panel_collapsed'; // 面板收起/展开状态（—/+ 按钮，跨页面保持）
 
     // ============================================================
     // 小工具
@@ -1124,10 +1125,17 @@
             panel.style.display = 'none';
         });
 
+        // 恢复上次收起/展开状态（跨页面保持）
+        if (gmGet(KEY_PANEL_COLLAPSED, false)) {
+            body.style.display = 'none';
+            mini.textContent = '+';
+        }
+
         mini.addEventListener('click', () => {
             const collapsed = body.style.display === 'none';
             body.style.display = collapsed ? '' : 'none';
             mini.textContent = collapsed ? '—' : '+';
+            gmSet(KEY_PANEL_COLLAPSED, !collapsed);
         });
 
         // 拖动
