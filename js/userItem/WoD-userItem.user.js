@@ -414,13 +414,13 @@
     let allowSell = localStorage.getItem(SPECIAL_ITEMS_ALLOW_SELL);
     let specialItemsMap = {};
     let nowTime = new Date().getTime();
-    if (
-      specialItemsStr &&
-      specialItemsVer &&
-      nowTime - specialItemsVer < 7 * 24 * 60 * 60 * 1000
-    ) {
+    if (specialItemsStr && specialItemsVer) {
+      // 缓存未过期直接用；过期了先标记着，请求失败也不至于完全不标记
       specialItemsMap = JSON.parse(specialItemsStr);
       doMark(specialItemsMap, allowSell);
+      if (nowTime - specialItemsVer < 7 * 24 * 60 * 60 * 1000) {
+        return;
+      }
     } else {
       // 获取特殊物品信息
       fetch("https://www.christophero.xyz/wod/item/loadDict", {
@@ -447,6 +447,9 @@
           );
           localStorage.setItem(SPECIAL_ITEMS_VERSION, nowTime);
           doMark(specialItemsMap, allowSell);
+        })
+        .catch((e) => {
+          console.warn("[WoD物品批量存放仓库] 特殊物品词典请求失败", e);
         });
     }
   };
