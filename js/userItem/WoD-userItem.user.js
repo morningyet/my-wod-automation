@@ -8,7 +8,7 @@
 // @require      https://code.jquery.com/jquery-3.6.0.min.js
 // @grant        none
 // @modifier     morningyet
-// @version      2026.08.18.1
+// @version      2026.08.18.2
 // @updateURL    https://gitee.com/Morningyet/my-wod-automation/raw/master/js/userItem/WoD-userItem.user.js
 // @downloadURL  https://gitee.com/Morningyet/my-wod-automation/raw/master/js/userItem/WoD-userItem.user.js
 // ==/UserScript==
@@ -423,7 +423,7 @@
       }
     } else {
       // 获取特殊物品信息
-      fetch("https://www.christophero.xyz/wod/item/loadDict", {
+      fetch("https://christophero.xyz/wod/item/loadDict", {
         method: "POST",
         body: JSON.stringify({ dictTypeList: ["specialItems"] }),
         headers: {
