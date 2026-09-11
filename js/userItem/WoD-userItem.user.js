@@ -8,7 +8,7 @@
 // @require      https://code.jquery.com/jquery-3.6.0.min.js
 // @grant        none
 // @modifier     morningyet
-// @version      2026.08.18.0
+// @version      2026.08.18.1
 // @updateURL    https://gitee.com/Morningyet/my-wod-automation/raw/master/js/userItem/WoD-userItem.user.js
 // @downloadURL  https://gitee.com/Morningyet/my-wod-automation/raw/master/js/userItem/WoD-userItem.user.js
 // ==/UserScript==
