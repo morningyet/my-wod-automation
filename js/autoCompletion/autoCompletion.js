@@ -17,8 +17,8 @@
 // @require       https://code.jquery.com/jquery-3.3.1.min.js
 // @require       https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.3/js/select2.min.js
 // @resource      select2-css https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.3/css/select2.min.css
-// @updateURL     https://gitee.com/Morningyet/my-wod-automation/raw/master/js/autoCompletion/autoCompletion.js
-// @downloadURL   https://gitee.com/Morningyet/my-wod-automation/raw/master/js/autoCompletion/autoCompletion.js
+// @updateURL     https://raw.githubusercontent.com/morningyet/my-wod-automation/master/js/autoCompletion/autoCompletion.js
+// @downloadURL   https://raw.githubusercontent.com/morningyet/my-wod-automation/master/js/autoCompletion/autoCompletion.js
 // ==/UserScript==
 
 GM_addStyle(GM_getResourceText("select2-css"));

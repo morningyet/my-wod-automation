@@ -13,8 +13,8 @@
 // @grant        GM_registerMenuCommand
 // @grant        GM_addStyle
 // @version      0.4.4
-// @updateURL    https://gitee.com/Morningyet/my-wod-automation/raw/master/js/wod-harvest/wod-harvest.user.js
-// @downloadURL  https://gitee.com/Morningyet/my-wod-automation/raw/master/js/wod-harvest/wod-harvest.user.js
+// @updateURL    https://raw.githubusercontent.com/morningyet/my-wod-automation/master/js/wod-harvest/wod-harvest.user.js
+// @downloadURL  https://raw.githubusercontent.com/morningyet/my-wod-automation/master/js/wod-harvest/wod-harvest.user.js
 // @run-at       document-end
 // @license      MIT
 // ==/UserScript==

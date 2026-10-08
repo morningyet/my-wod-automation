@@ -9,8 +9,8 @@
 // @grant        none
 // @modifier     morningyet
 // @version      2026.08.18.2
-// @updateURL    https://gitee.com/Morningyet/my-wod-automation/raw/master/js/userItem/WoD-userItem.user.js
-// @downloadURL  https://gitee.com/Morningyet/my-wod-automation/raw/master/js/userItem/WoD-userItem.user.js
+// @updateURL    https://raw.githubusercontent.com/morningyet/my-wod-automation/master/js/userItem/WoD-userItem.user.js
+// @downloadURL  https://raw.githubusercontent.com/morningyet/my-wod-automation/master/js/userItem/WoD-userItem.user.js
 // ==/UserScript==
 
 (function () {

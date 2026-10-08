@@ -13,8 +13,8 @@
 // @connect        christophero.xyz
 // @modifier       Christophero
 // @version        2023.06.04.1
-// @updateURL      https://gitee.com/Morningyet/my-wod-automation/raw/master/js/wod-drop-item-show/wod-drop-item-show.user.js
-// @downloadURL    https://gitee.com/Morningyet/my-wod-automation/raw/master/js/wod-drop-item-show/wod-drop-item-show.user.js
+// @updateURL      https://raw.githubusercontent.com/morningyet/my-wod-automation/master/js/wod-drop-item-show/wod-drop-item-show.user.js
+// @downloadURL    https://raw.githubusercontent.com/morningyet/my-wod-automation/master/js/wod-drop-item-show/wod-drop-item-show.user.js
 // ==/UserScript==
 
 (function () {

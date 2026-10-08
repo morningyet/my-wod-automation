@@ -5,7 +5,7 @@
 概述
 ----
 本目录包含 8 个 Tampermonkey（油猴）用户脚本，全部服务于
-World of Dungeons（WoD）网页游戏。仓库托管在 Gitee 上，作为
+World of Dungeons（WoD）网页游戏。仓库托管在 GitHub 上，作为
 油猴脚本的 @updateURL / @downloadURL 分发源。
 
 脚本来源分为两类：
