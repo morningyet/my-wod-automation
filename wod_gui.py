@@ -13,6 +13,8 @@ import customtkinter as ctk
 from tkinter import scrolledtext
 # 从 wod_scheduler 导入 WoDAutomation 类
 from wod_scheduler import WoDAutomation
+# 从 wod_scheduler 导入卖出记录存储键
+from wod_scheduler import SELL_STORAGE_KEY
 
 
 # 定义 WoDGUI 类，创建 GUI 控制面板
@@ -39,6 +41,7 @@ class WoDGUI:
         self.scheduler_running = False  # 定时任务是否运行中
         self.scheduler_timer = None  # 定时器对象
         self.next_run_time = None  # 下次执行时间
+        self.sell_monitoring = False  # 卖出记录是否监听中
 
         # 创建界面组件
         self.create_widgets()
@@ -177,7 +180,7 @@ class WoDGUI:
 
         # 第二行：移入仓库 + 切换英雄
         row2 = ctk.CTkFrame(manual_frame, fg_color="transparent")
-        row2.pack(fill="x", padx=10, pady=(2, 10))
+        row2.pack(fill="x", padx=10, pady=(2, 2))
 
         self.btn_move = ctk.CTkButton(
             row2,
@@ -196,6 +199,77 @@ class WoDGUI:
             state="disabled"
         )
         self.btn_next_hero.pack(side="left", expand=True, fill="x", padx=(3, 0))
+
+        # 第三行：一键 仓库耗材全部入团仓（多轮移动，执行时间可能较长）
+        self.btn_consumables_to_group = ctk.CTkButton(
+            manual_frame,
+            text="仓库耗材全部入团仓",
+            command=self.manual_consumables_to_group,
+            height=28,
+            state="disabled"
+        )
+        self.btn_consumables_to_group.pack(fill="x", padx=10, pady=(2, 2))
+
+        # 第四行：一键 镶嵌材料全部入团仓
+        self.btn_pieces_to_group = ctk.CTkButton(
+            manual_frame,
+            text="镶嵌材料全部入团仓",
+            command=self.manual_pieces_to_group,
+            height=28,
+            state="disabled"
+        )
+        self.btn_pieces_to_group.pack(fill="x", padx=10, pady=2)
+
+        # 第五行：一键 团队物品全部入宝库
+        self.btn_group_items_to_treasury = ctk.CTkButton(
+            manual_frame,
+            text="团队物品全部入宝库",
+            command=self.manual_group_items_to_treasury,
+            height=28,
+            state="disabled"
+        )
+        self.btn_group_items_to_treasury.pack(fill="x", padx=10, pady=(2, 10))
+
+        # ===== 自动出售区域 =====
+        # 创建自动出售区域的框架
+        sellable_frame = ctk.CTkFrame(self.left_panel)
+        sellable_frame.pack(fill="x", padx=10, pady=5)
+
+        # 创建自动出售标题
+        sellable_title = ctk.CTkLabel(
+            sellable_frame, text="自动出售", font=ctk.CTkFont(weight="bold")
+        )
+        sellable_title.pack(pady=(10, 5))
+
+        # 一键出售按钮（按 js/sellable-items.js 清单圈选并确认卖出，仅当前英雄）
+        self.btn_auto_sell = ctk.CTkButton(
+            sellable_frame,
+            text="出售可卖物品（当前英雄）",
+            command=self.manual_auto_sell,
+            height=32,
+            state="disabled"
+        )
+        self.btn_auto_sell.pack(fill="x", padx=10, pady=(0, 5))
+
+        # 轮询所有英雄出售按钮
+        self.btn_auto_sell_all = ctk.CTkButton(
+            sellable_frame,
+            text="出售可卖物品（轮询所有英雄）",
+            command=self.manual_auto_sell_all,
+            height=32,
+            state="disabled"
+        )
+        self.btn_auto_sell_all.pack(fill="x", padx=10, pady=(0, 5))
+
+        # 刷新清单按钮（把浏览器缓冲的卖出记录合并进 sellable-items.js 并清空缓冲）
+        self.btn_flush_sellable = ctk.CTkButton(
+            sellable_frame,
+            text="刷新清单",
+            command=self.manual_flush_sellable,
+            height=28,
+            state="disabled"
+        )
+        self.btn_flush_sellable.pack(fill="x", padx=10, pady=(0, 10))
 
         # ===== 定时任务区域 =====
         # 创建定时任务区域的框架
@@ -236,6 +310,43 @@ class WoDGUI:
         )
         self.lbl_next_run.pack(pady=(0, 10))
 
+        # ===== 卖出记录区域 =====
+        sell_frame = ctk.CTkFrame(self.left_panel)
+        sell_frame.pack(fill="x", padx=10, pady=5)
+
+        sell_title = ctk.CTkLabel(sell_frame, text="卖出记录", font=ctk.CTkFont(weight="bold"))
+        sell_title.pack(pady=(10, 5))
+
+        sell_row = ctk.CTkFrame(sell_frame, fg_color="transparent")
+        sell_row.pack(fill="x", padx=10, pady=(0, 10))
+
+        self.btn_sell_monitor = ctk.CTkButton(
+            sell_row,
+            text="开始记录",
+            command=self.toggle_sell_monitor,
+            height=32,
+            state="disabled"
+        )
+        self.btn_sell_monitor.pack(side="left", expand=True, fill="x", padx=(0, 3))
+
+        self.btn_sell_clear = ctk.CTkButton(
+            sell_row,
+            text="清空清单",
+            command=self.clear_sold,
+            height=32,
+            state="disabled"
+        )
+        self.btn_sell_clear.pack(side="left", expand=True, fill="x", padx=(3, 3))
+
+        self.btn_sell_export = ctk.CTkButton(
+            sell_row,
+            text="导出清单",
+            command=self.export_sold,
+            height=32,
+            state="disabled"
+        )
+        self.btn_sell_export.pack(side="left", expand=True, fill="x", padx=(3, 0))
+
     # 创建日志面板
     def create_log_panel(self):
         """创建日志面板"""
@@ -255,6 +366,23 @@ class WoDGUI:
         )
         # 填充剩余空间
         self.log_text.pack(fill="both", expand=True, padx=10, pady=(0, 10))
+
+        # 可卖物品清单标题
+        sold_title = ctk.CTkLabel(
+            self.right_panel,
+            text="可卖物品清单",
+            font=ctk.CTkFont(size=14, weight="bold")
+        )
+        sold_title.pack(pady=(0, 5))
+
+        # 可卖物品清单文本框（实时显示当前新增卖出的物品）
+        self.sold_text = ctk.CTkTextbox(
+            self.right_panel,  # 父容器
+            font=ctk.CTkFont(family="Consolas", size=11),  # 使用等宽字体
+            wrap="word",  # 按单词换行
+            height=150  # 固定高度
+        )
+        self.sold_text.pack(fill="x", padx=10, pady=(0, 10))
 
         # 创建清空按钮
         btn_clear = ctk.CTkButton(
@@ -391,10 +519,24 @@ class WoDGUI:
         self.btn_select_all.configure(state="normal")
         self.btn_move.configure(state="normal")
         self.btn_next_hero.configure(state="normal")
+        self.btn_consumables_to_group.configure(state="normal")
+        self.btn_pieces_to_group.configure(state="normal")
+        self.btn_group_items_to_treasury.configure(state="normal")
+        self.btn_auto_sell.configure(state="normal")
+        self.btn_auto_sell_all.configure(state="normal")
+        self.btn_flush_sellable.configure(state="normal")
         self.btn_schedule.configure(state="normal")
+        self.btn_sell_monitor.configure(state="normal")
+        self.btn_sell_clear.configure(state="normal")
+        self.btn_sell_export.configure(state="normal")
 
         # 记录连接成功的日志
         self.log("INFO", "连接成功!")
+
+        # 连接后自动启动卖出记录监听
+        self.start_sell_monitor_ui()
+        # 把已采集的可卖物品加载进清单框显示
+        self._load_sold_list()
 
     # 连接失败回调
     def _on_connect_error(self, error):
@@ -450,6 +592,8 @@ class WoDGUI:
         self._set_buttons_enabled(True)
         # 记录收菜完成的日志
         self.log("INFO", "收菜完成!")
+        # 收菜会重建 automation，收完后重启卖出记录监听
+        self.start_sell_monitor_ui()
 
     # 收菜出错回调
     def _on_harvest_error(self, error):
@@ -458,6 +602,8 @@ class WoDGUI:
         self._set_buttons_enabled(True)
         # 记录收菜出错的日志
         self.log("ERROR", f"收菜出错: {error}")
+        # 收菜会重建 automation，出错后也重启卖出记录监听
+        self.start_sell_monitor_ui()
 
     # ===== 手动操作 =====
     # 手动筛选耗材
@@ -466,7 +612,7 @@ class WoDGUI:
         # 记录筛选耗材的日志
         self.log("INFO", "筛选耗材...")
         # 在后台线程中运行筛选耗材
-        self.run_async(self.automation.filter_consumables())
+        self.run_async(self.automation.filter_seconds())
 
     # 手动全选
     def manual_select_all(self):
@@ -492,8 +638,74 @@ class WoDGUI:
         """手动移入仓库"""
         # 记录移入仓库的日志
         self.log("INFO", "移入仓库...")
-        # 在后台线程中运行移入仓库
-        self.run_async(self.automation.select_all_and_move_to_warehouse())
+        # 在后台线程中运行移入仓库（耗材→团队仓库）
+        self.run_async(self.automation.move_to_warehouse("go_group_2", "团队仓库"))
+
+    # ===== 一键批量操作（筛选+多轮移动，执行时间可能较长） =====
+    # 一键：当前英雄仓库的耗材全部移入团队仓库
+    def manual_consumables_to_group(self):
+        """一键：仓库耗材全部入团仓"""
+        self._run_onekey(
+            self.automation.move_consumables_to_group2, "一键耗材入团仓"
+        )
+
+    # 一键：当前英雄仓库的镶嵌材料全部移入团队仓库
+    def manual_pieces_to_group(self):
+        """一键：镶嵌材料全部入团仓"""
+        self._run_onekey(
+            self.automation.move_pieces_to_group2, "一键镶嵌入团仓"
+        )
+
+    # 一键：当前英雄仓库的团队物品全部移入宝库
+    def manual_group_items_to_treasury(self):
+        """一键：团队物品全部入宝库"""
+        self._run_onekey(
+            self.automation.move_group_items_to_treasury, "一键团队物品入宝库"
+        )
+
+    # 一键操作通用执行器：禁用按钮 → 后台执行 → 恢复按钮
+    def _run_onekey(self, coro_factory, title):
+        """一键操作通用执行器
+
+        coro_factory: 无参可调用，返回待执行的协程（每次调用生成新协程）
+        title: 日志显示的操作名
+        """
+        # 记录日志并禁用所有操作按钮（多轮移动，执行时间可能较长）
+        self.log("INFO", f"{title}开始...")
+        self._set_buttons_enabled(False)
+
+        # 定义异步任务
+        async def do_onekey():
+            try:
+                # 执行一键操作（重置筛选 → 筛选 → 多轮移入 → 恢复页面）
+                await coro_factory()
+                # 在主线程中调用完成回调
+                self.root.after(0, lambda: self._on_onekey_complete(title))
+            # 如果出现异常
+            except Exception as e:
+                # 先捕获错误消息，避免 lambda 作用域问题
+                error_msg = str(e)
+                # 在主线程中调用出错回调
+                self.root.after(0, lambda: self._on_onekey_error(title, error_msg))
+
+        # 在后台线程中运行异步函数
+        self.run_async(do_onekey())
+
+    # 一键操作完成回调
+    def _on_onekey_complete(self, title):
+        """一键操作完成回调"""
+        # 重新启用所有操作按钮
+        self._set_buttons_enabled(True)
+        # 记录完成日志
+        self.log("INFO", f"{title}完成!")
+
+    # 一键操作出错回调
+    def _on_onekey_error(self, title, error):
+        """一键操作出错回调"""
+        # 重新启用所有操作按钮
+        self._set_buttons_enabled(True)
+        # 记录出错日志
+        self.log("ERROR", f"{title}出错: {error}")
 
     # 手动切换英雄
     def manual_next_hero(self):
@@ -502,6 +714,54 @@ class WoDGUI:
         self.log("INFO", "切换英雄...")
         # 在后台线程中运行切换英雄
         self.run_async(self.automation.switch_to_next_hero())
+
+    # ===== 自动出售 =====
+    # 一键：按 sellable-items.js 清单圈选并出售当前英雄的可卖物品
+    def manual_auto_sell(self):
+        """一键：自动出售当前英雄的可卖物品"""
+        self._run_onekey(
+            self.automation.sell_sellable_items, "自动出售"
+        )
+
+    # 一键：轮询所有英雄，逐个出售可卖物品
+    def manual_auto_sell_all(self):
+        """一键：轮询所有英雄自动出售可卖物品（耗时较长）"""
+        self._run_onekey(
+            self.automation.sell_all_heroes, "轮询所有英雄出售"
+        )
+
+    # 一键：刷新可卖清单（合并浏览器缓冲 → 写入 sellable-items.js → 清空缓冲）
+    def manual_flush_sellable(self):
+        """一键：刷新可卖物品清单"""
+        self.log("INFO", "刷新清单...")
+        self.btn_flush_sellable.configure(state="disabled")
+
+        # 定义异步刷新函数
+        async def do_flush():
+            try:
+                new_count, total = await self.automation.flush_sold_buffer()
+                # 回主线程展示结果
+                self.root.after(0, lambda: self._on_flush_complete(new_count, total))
+            except Exception as e:
+                error_msg = str(e)
+                self.root.after(0, lambda: self._on_flush_error(error_msg))
+
+        self.run_async(do_flush())
+
+    # 刷新清单完成回调
+    def _on_flush_complete(self, new_count, total):
+        """刷新清单完成：日志输出新增与总数"""
+        self.btn_flush_sellable.configure(state="normal")
+        if new_count:
+            self.log("INFO", f"刷新清单完成：新增 {new_count} 条，清单共 {total} 条")
+        else:
+            self.log("INFO", f"刷新清单完成：缓冲无新物品，清单共 {total} 条")
+
+    # 刷新清单出错回调
+    def _on_flush_error(self, error):
+        """刷新清单出错"""
+        self.btn_flush_sellable.configure(state="normal")
+        self.log("ERROR", f"刷新清单失败: {error}")
 
     # ===== 定时任务 =====
     # 切换定时任务状态
@@ -613,6 +873,87 @@ class WoDGUI:
         # 记录定时任务停止的日志
         self.log("INFO", "定时任务已停止")
 
+    # ===== 卖出记录 =====
+    # 切换卖出记录监听
+    def toggle_sell_monitor(self):
+        """切换卖出记录监听状态"""
+        if self.sell_monitoring:
+            self.log("INFO", "停止记录卖出物品...")
+            self.sell_monitoring = False
+            self.btn_sell_monitor.configure(text="开始记录")
+            self.run_async(self.automation.stop_sell_monitor())
+        else:
+            self.log("INFO", "开始记录卖出物品...")
+            self.start_sell_monitor_ui()
+
+    # 启动卖出记录（可重复调用：automation 层有去重，自动/手动都走这里）
+    def start_sell_monitor_ui(self):
+        """启动卖出记录监听（连接后自动调用，也可手动触发）"""
+        if not self.automation:
+            return
+        self.sell_monitoring = True
+        self.btn_sell_monitor.configure(text="停止记录")
+        self.automation.sold_items_callback = self._on_sold_items
+        self.run_async(self.automation.start_sell_monitor())
+
+    # 清单框只显示本次会话「新增」的物品（清单文件里已有的不显示）
+    def _load_sold_list(self):
+        """会话开始时清空清单框：只显示后续新增的物品"""
+        self.sold_text.delete("1.0", "end")
+
+    # 卖出记录回调（在后台线程触发，用 root.after 回主线程更新 UI）
+    def _on_sold_items(self, new_names):
+        """收到新增卖出的物品名，回主线程更新清单框"""
+        self.root.after(0, lambda: self._append_sold_items(new_names))
+
+    # 在主线程把新增名字插入清单框
+    def _append_sold_items(self, new_names):
+        """在主线程把新增名字插入清单框"""
+        for name in new_names:
+            self.sold_text.insert("end", name + "\n")
+        self.sold_text.see("end")
+
+    # 导出可卖物品清单
+    def export_sold(self):
+        """导出可卖物品清单到 txt 文件"""
+        try:
+            names = self.automation._read_existing_names() if self.automation else []
+        except Exception:
+            names = []
+        if not names:
+            self.log("INFO", "可卖物品清单为空，无内容导出")
+            return
+        # 弹出文件保存对话框
+        from tkinter import filedialog
+        path = filedialog.asksaveasfilename(
+            title="导出可卖物品清单",
+            defaultextension=".txt",
+            filetypes=[("文本文件", "*.txt"), ("所有文件", "*.*")],
+            initialfile="可卖物品.txt",
+        )
+        if not path:
+            return
+        with open(path, "w", encoding="utf-8") as f:
+            f.write("\n".join(names) + "\n")
+        self.log("INFO", f"已导出 {len(names)} 个可卖物品到 {path}")
+
+    # 清空卖出清单
+    def clear_sold(self):
+        """清空卖出清单（显示框 + localStorage + JS 文件）"""
+        self.sold_text.delete("1.0", "end")
+        if self.automation:
+            self.run_async(self._clear_sold_async())
+
+    async def _clear_sold_async(self):
+        """清空 localStorage 与 JS 数据文件"""
+        try:
+            if self.automation.page:
+                await self.automation.page.evaluate(f"localStorage.removeItem('{SELL_STORAGE_KEY}')")
+            self.automation._clear_sell_js()
+            self.log("INFO", "已清空卖出清单")
+        except Exception as e:
+            self.log("ERROR", f"清空卖出清单失败: {e}")
+
     # ===== 辅助方法 =====
     # 设置按钮状态
     def _set_buttons_enabled(self, enabled):
@@ -625,6 +966,12 @@ class WoDGUI:
         self.btn_select_all.configure(state=state)
         self.btn_move.configure(state=state)
         self.btn_next_hero.configure(state=state)
+        self.btn_consumables_to_group.configure(state=state)
+        self.btn_pieces_to_group.configure(state=state)
+        self.btn_group_items_to_treasury.configure(state=state)
+        self.btn_auto_sell.configure(state=state)
+        self.btn_auto_sell_all.configure(state=state)
+        self.btn_flush_sellable.configure(state=state)
         # 注意：不修改 btn_schedule 的状态，允许收菜时仍能停止定时任务
 
     # 运行 GUI
